@@ -216,6 +216,7 @@ function h(tag,a,...kids){
     if(k==="cls")el.className=v;
     else if(k.startsWith("on")&&typeof v==="function")el.addEventListener(k.slice(2).toLowerCase(),v);
     else if(k==="sty"&&typeof v==="object")Object.assign(el.style,v);
+    else if(k==="disabled")el.disabled=v;
     else el.setAttribute(k,v);
   });
   kids.flat(9).forEach(c=>{if(c==null||c===false)return;el.appendChild(typeof c==="string"||typeof c==="number"?document.createTextNode(String(c)):c);});
