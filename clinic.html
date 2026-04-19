@@ -838,14 +838,78 @@ function renderSchedule(role){
           h("button",{cls:"btn bs",onclick:()=>detWrap.innerHTML=""},"✕")
         ));
       } else if(s.available){
-        box.appendChild(h("div",{sty:{fontSize:13,color:"var(--mu)",marginBottom:12}},"Слот свободен"+(s.clinic?" · "+s.clinic:"")));
-        box.appendChild(h("div",{sty:{display:"flex",gap:8}},
-          h("button",{cls:"btn bp",sty:{flex:1},onclick:async()=>{
-            const ns={...S.schedule,[SCR.schDate]:{...S.schedule[SCR.schDate],slots:(S.schedule[SCR.schDate]?.slots||[]).map(sl=>sl.id!==s.id?sl:{...sl,available:false})}};
-            S.schedule=ns;triggerSave(["schedule"]);rebSlots();
-          }},"Закрыть слот"),
-          h("button",{cls:"btn bs",onclick:()=>detWrap.innerHTML=""},"Отмена")
-        ));
+        box.appendChild(h("div",{sty:{fontSize:13,color:"var(--mu)",marginBottom:14}},"Слот свободен"+(s.clinic?" · "+s.clinic:"")));
+        let selPat=null,showNewPat=false,selSvc=null,showNewSvc=false,customDur=null;
+        const bookWrap=h("div",{});box.appendChild(bookWrap);
+        function rebBook(){
+          bookWrap.innerHTML="";
+          // Patient selector
+          const patSel=h("select",{cls:"fi"});
+          patSel.appendChild(h("option",{value:""},"— Выберите пациента —"));
+          [...S.patients].sort((a,b)=>a.name.localeCompare(b.name)).forEach(p=>{const o=h("option",{value:p.id},p.name+" · "+p.phone);if(selPat?.id===p.id)o.selected=true;patSel.appendChild(o);});
+          patSel.appendChild(h("option",{value:"__new__"},"+ Создать нового пациента..."));
+          patSel.onchange=e=>{if(e.target.value==="__new__"){showNewPat=true;selPat=null;}else{selPat=S.patients.find(p=>p.id===e.target.value)||null;showNewPat=false;}rebBook();};
+          bookWrap.appendChild(h("div",{cls:"fg"},h("label",{cls:"fl"},"Пациент"),patSel));
+          // New patient mini-form
+          if(showNewPat){
+            const nN=h("input",{cls:"fi",placeholder:"Имя и фамилия *"});
+            const nP=h("input",{cls:"fi",type:"tel",placeholder:"Телефон *",sty:{marginTop:8}});
+            bookWrap.appendChild(h("div",{cls:"card",sty:{marginBottom:10}},
+              h("div",{sty:{fontWeight:700,marginBottom:8}},"Новый пациент"),nN,nP,
+              h("button",{cls:"btn bs bsm",sty:{marginTop:8},onclick:async()=>{
+                if(!nN.value.trim()||!nP.value.trim())return;
+                const np={id:uid(),name:nN.value.trim(),phone:nP.value.trim(),source:"other",birthDate:"",complaint:"",tasks:[],notes:[],createdAt:new Date().toISOString(),status:"new"};
+                await savePats([...S.patients,np],true);selPat=np;showNewPat=false;rebBook();
+              }},"Создать и выбрать")
+            ));
+          }
+          // Service selector
+          const svcSel=h("select",{cls:"fi"});
+          svcSel.appendChild(h("option",{value:""},"— Выберите услугу —"));
+          S.services.forEach(sv=>{const o=h("option",{value:sv.id},sv.name+(sv.price?" · "+Number(sv.price).toLocaleString("ru-RU")+" ₽":""));if(selSvc?.id===sv.id)o.selected=true;svcSel.appendChild(o);});
+          svcSel.appendChild(h("option",{value:"__new__"},"+ Создать новую услугу..."));
+          svcSel.onchange=e=>{if(e.target.value==="__new__"){showNewSvc=true;selSvc=null;}else{selSvc=S.services.find(sv=>sv.id===e.target.value)||null;customDur=selSvc?.duration||null;showNewSvc=false;}rebBook();};
+          bookWrap.appendChild(h("div",{cls:"fg"},h("label",{cls:"fl"},"Услуга"),svcSel));
+          // New service mini-form
+          if(showNewSvc){
+            const sN=h("input",{cls:"fi",placeholder:"Название услуги *"});
+            const sP=h("input",{cls:"fi",type:"number",placeholder:"Стоимость, ₽",sty:{marginTop:8}});
+            const sD=h("input",{cls:"fi",type:"number",placeholder:"Длительность, мин",sty:{marginTop:8}});
+            bookWrap.appendChild(h("div",{cls:"card",sty:{marginBottom:10}},
+              h("div",{sty:{fontWeight:700,marginBottom:8}},"Новая услуга"),sN,sP,sD,
+              h("button",{cls:"btn bs bsm",sty:{marginTop:8},onclick:()=>{
+                if(!sN.value.trim())return;
+                const sv={id:uid(),name:sN.value.trim(),price:sP.value||"",duration:parseInt(sD.value)||30};
+                S.services=[...S.services,sv];triggerSave(["services"]);selSvc=sv;customDur=sv.duration;showNewSvc=false;rebBook();
+              }},"Создать услугу")
+            ));
+          }
+          // Duration override
+          if(selSvc){
+            const durI=h("input",{cls:"fi",type:"number",value:String(customDur||selSvc.duration||30)});
+            durI.oninput=e=>customDur=parseInt(e.target.value)||30;
+            bookWrap.appendChild(h("div",{cls:"fg"},h("label",{cls:"fl"},"Длительность (мин)"),durI));
+          }
+          const canBook=!!(selPat&&selSvc&&!showNewPat&&!showNewSvc);
+          // Book button
+          const bookBtn=h("button",{cls:"btn bp bw",onclick:async()=>{
+            const dur=customDur||selSvc.duration||30;
+            const upSlot={...s,available:false,patientId:selPat.id,patientName:selPat.name,serviceId:selSvc.id,serviceName:selSvc.name,serviceDuration:dur};
+            S.patients=S.patients.map(pr=>pr.id!==selPat.id?pr:{...pr,status:pr.status==="new"?"scheduled":pr.status});
+            S.schedule={...S.schedule,[SCR.schDate]:{...S.schedule[SCR.schDate],slots:(S.schedule[SCR.schDate]?.slots||[]).map(sl=>sl.id!==s.id?sl:upSlot)}};
+            triggerSave(["patients","schedule"]);rebSlots();
+          }},canBook?"✓ Записать на приём":"Выберите пациента и услугу");
+          bookBtn.disabled=!canBook;
+          bookWrap.appendChild(h("div",{sty:{marginBottom:8}},bookBtn));
+          bookWrap.appendChild(h("div",{sty:{display:"flex",gap:8}},
+            h("button",{cls:"btn bs",sty:{flex:1},onclick:async()=>{
+              S.schedule={...S.schedule,[SCR.schDate]:{...S.schedule[SCR.schDate],slots:(S.schedule[SCR.schDate]?.slots||[]).map(sl=>sl.id!==s.id?sl:{...sl,available:false})}};
+              triggerSave(["schedule"]);rebSlots();
+            }},"Закрыть слот"),
+            h("button",{cls:"btn bs",onclick:()=>detWrap.innerHTML=""},"✕")
+          ));
+        }
+        rebBook();
       } else {
         box.appendChild(h("div",{sty:{fontSize:13,color:"var(--mu)",marginBottom:12}},"Слот закрыт"));
         box.appendChild(h("div",{sty:{display:"flex",gap:8}},
