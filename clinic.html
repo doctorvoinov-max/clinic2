@@ -1,0 +1,986 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Доктор Войнов">
+<title>Доктор Войнов — Клиника</title>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;font-family:'Manrope',sans-serif;-webkit-tap-highlight-color:transparent}
+:root{--p:#0D6E5F;--plt:#1A8A78;--pll:#E8F5F2;--a:#C9720A;--r:#DC2626;--bg:#F4F1EC;--sf:#fff;--bd:rgba(0,0,0,0.08);--tx:#1A1A1A;--mu:#6B7280;--hi:#9CA3AF}
+body{background:var(--bg)}
+.hdr{background:var(--p);color:#fff;padding:13px 18px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
+.ht{font-size:15px;font-weight:700}.hs{font-size:11px;opacity:.65;margin-top:1px}
+.hb{background:rgba(255,255,255,.18);border:none;color:#fff;padding:5px 12px;border-radius:8px;font-size:12px;cursor:pointer;font-family:inherit}
+.scr{flex:1;overflow-y:auto;padding:16px;max-width:640px;width:100%;margin:0 auto;padding-bottom:90px}
+.bn{background:#fff;border-top:1px solid var(--bd);display:flex;position:fixed;bottom:0;left:0;right:0;z-index:50}
+.bt{flex:1;display:flex;flex-direction:column;align-items:center;padding:10px 4px 14px;border:none;background:none;cursor:pointer;color:var(--hi);font-family:inherit;position:relative}
+.bt.on{color:var(--p)}.bti{font-size:22px;margin-bottom:2px}.btl{font-size:10px;font-weight:600}
+.bdg{position:absolute;top:6px;right:calc(50% - 20px);background:#EF4444;color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:10px;min-width:16px;text-align:center}
+.card{background:var(--sf);border-radius:14px;padding:14px;margin-bottom:10px;border:1px solid var(--bd)}
+.crow{background:var(--sf);border-radius:12px;padding:11px 14px;margin-bottom:8px;border:1px solid var(--bd);display:flex;align-items:center;gap:12px;cursor:pointer}
+.crow:active{border-color:var(--p)}
+.st{font-size:11px;font-weight:700;color:var(--hi);text-transform:uppercase;letter-spacing:.8px;margin:14px 0 8px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:11px 18px;border-radius:10px;border:none;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer}
+.btn:disabled{opacity:.4}
+.bp{background:var(--p);color:#fff}.bp:active{background:var(--plt)}
+.bs{background:var(--pll);color:var(--p)}.ba{background:#FEF3E2;color:var(--a)}
+.bw{width:100%}.bsm{padding:7px 14px;font-size:12px;border-radius:8px}
+.bbk{background:none;border:none;color:var(--p);font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:4px;padding:0;margin-bottom:16px}
+.fg{margin-bottom:13px}.fl{font-size:11px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;display:block}
+.fi{width:100%;padding:11px 13px;border:1.5px solid var(--bd);border-radius:10px;font-family:inherit;font-size:15px;color:var(--tx);background:#fff;outline:none;-webkit-appearance:none}
+.fi:focus{border-color:var(--p)}
+select.fi{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath fill='%236B7280' d='M5 7L1 3h8z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:30px}
+textarea.fi{min-height:80px;resize:vertical;font-size:14px}
+.av{width:40px;height:40px;border-radius:50%;background:var(--pll);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;color:var(--p);flex-shrink:0}
+.tsk{display:flex;align-items:flex-start;gap:11px;padding:11px;background:#fff;border-radius:12px;border:1px solid var(--bd);margin-bottom:7px}
+.tsk.urg{border-left:3px solid var(--r)}
+.chk{width:24px;height:24px;border-radius:50%;border:2px solid var(--bd);cursor:pointer;flex-shrink:0;margin-top:1px;background:#fff;display:flex;align-items:center;justify-content:center;font-size:13px}
+.tag{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600}
+.slt{display:inline-flex;flex-direction:column;padding:7px 10px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:1.5px solid transparent;margin:3px;min-width:60px;text-align:center}
+.slt.fr{background:var(--pll);color:var(--p)}.slt.bk{background:#F3F4F6;color:var(--hi)}.slt.cls{background:#FEF2F2;color:var(--r);cursor:default}
+.slt-clinic{font-size:9px;font-weight:500;opacity:.7;margin-top:2px;text-overflow:ellipsis;overflow:hidden;white-space:nowrap;max-width:70px}
+.dr{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin-bottom:14px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.dr::-webkit-scrollbar{display:none}
+.dc{flex-shrink:0;padding:8px 12px;border-radius:9px;border:1.5px solid var(--bd);background:#fff;cursor:pointer;font-size:13px;font-weight:600;color:var(--mu);font-family:inherit;line-height:1.3;text-align:center;min-width:48px}
+.dc.on{background:var(--p);color:#fff;border-color:var(--p)}.dsb{font-size:10px;display:block}
+.ir{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--bd)}
+.ir:last-child{border:none}.ik{font-size:12px;color:var(--mu);flex-shrink:0;padding-top:1px}.iv{font-size:13px;font-weight:600;text-align:right;max-width:60%}
+.emp{text-align:center;padding:40px 20px;color:var(--mu)}.empi{font-size:40px;margin-bottom:10px}
+.tabs{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap}
+.tb{padding:7px 14px;border-radius:8px;border:none;cursor:pointer;font-family:inherit;font-size:13px;font-weight:600}
+.tb.on{background:var(--p);color:#fff}.tb.off{background:var(--bg);color:var(--mu)}
+.syncbar{padding:5px 16px;display:flex;align-items:center;justify-content:space-between;font-size:12px}
+.syncbar.ok{background:#E8F5F2;color:#059669}.syncbar.saving{background:#FEF3E2;color:#C9720A}.syncbar.err{background:#FEF2F2;color:#DC2626}
+.syncbar button{background:none;border:1px solid currentColor;font-size:11px;cursor:pointer;color:inherit;font-family:inherit;padding:2px 6px;border-radius:4px}
+.desktop{display:flex;min-height:100vh}
+.sb{width:200px;background:#fff;border-right:1px solid var(--bd);padding:16px 10px;display:flex;flex-direction:column;flex-shrink:0;position:sticky;top:0;height:100vh}
+.si{display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:9px;cursor:pointer;color:var(--mu);font-size:14px;font-weight:600;margin-bottom:3px;border:none;background:none;width:100%;font-family:inherit;text-align:left}
+.si:hover{background:var(--bg)}.si.on{background:var(--pll);color:var(--p)}
+.dmain{flex:1;padding:24px;overflow-y:auto;max-height:100vh}
+.sg{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px}
+.sc{background:#fff;border-radius:12px;padding:14px 10px;text-align:center;border:1px solid var(--bd);cursor:pointer}
+.sc:hover{border-color:var(--p)}.sn{font-size:26px;font-weight:800;color:var(--p)}.sl{font-size:11px;color:var(--mu);margin-top:2px}
+.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th{background:var(--bg);padding:9px 12px;text-align:left;font-size:11px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:.5px}
+.tbl td{padding:11px 12px;border-bottom:1px solid var(--bd)}
+.tbl tbody tr{cursor:pointer}.tbl tbody tr:hover td{background:#FAFAF8}
+.setup{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+.setup-box{width:100%;max-width:440px}
+.instr{background:#fff;border-radius:12px;padding:16px;border:1px solid var(--bd);font-size:13px;line-height:2;margin-top:20px}
+.loader{min-height:100vh;display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--mu)}
+.roles{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px}
+.role-card{background:#fff;border-radius:14px;padding:16px 20px;width:100%;max-width:340px;border:2px solid var(--bd);cursor:pointer;margin-bottom:10px;display:flex;align-items:center;gap:14px}
+.role-card:hover,.role-card:active{border-color:var(--p)}
+.datefield{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.alert{background:#FEF3E2;border:1px solid #FDE68A;border-radius:10px;padding:10px 14px;font-size:13px;color:#92400E;margin-bottom:10px}
+.alert.red{background:#FEF2F2;border-color:#FCA5A5;color:#991B1B}
+.book-btn{background:var(--p);color:#fff;border:none;border-radius:10px;padding:11px 16px;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;width:100%;margin-bottom:8px;display:flex;align-items:center;justify-content:center;gap:8px}
+@media(max-width:600px){.tbl th:nth-child(4),.tbl td:nth-child(4){display:none}.datefield{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+const CFG='voinov_api_url2',TK='voinov2026clinic';
+const CACHE_P='voinov_cache_patients',CACHE_S='voinov_cache_schedule';
+
+let S={
+  apiUrl:localStorage.getItem(CFG)||'',
+  role:null,
+  patients:[],
+  schedule:{},
+  sync:'ok',
+  loading:false,
+  dirty:false
+};
+
+// ---------- LOCAL CACHE ----------
+function cacheGet(k){try{const v=localStorage.getItem(k);return v?JSON.parse(v):null;}catch{return null;}}
+function cacheSet(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch{}}
+
+// ---------- API ----------
+async function apiGet(k){
+  const r=await fetch(S.apiUrl+'?key='+k,{redirect:'follow'});
+  if(!r.ok)throw new Error(r.status);
+  const t=await r.text();return t?JSON.parse(t):null;
+}
+function apiPost(k,v){
+  if(!S.apiUrl)return;
+  fetch(S.apiUrl,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({token:TK,key:k,value:JSON.stringify(v)})}).catch(()=>{});
+}
+
+async function loadData(){
+  if(!S.apiUrl)return;
+  S.loading=true;render();
+  // Load from cache immediately for fast display
+  const cp=cacheGet(CACHE_P),cs=cacheGet(CACHE_S);
+  if(cp)S.patients=cp;
+  if(cs)S.schedule=cs;
+  if(cp||cs){S.loading=false;render();}
+  // Then sync from API
+  try{
+    const[p,s]=await Promise.all([apiGet('patients'),apiGet('schedule')]);
+    S.patients=Array.isArray(p)?p:(cp||[]);
+    S.schedule=(s&&typeof s==='object')?s:(cs||buildSch());
+    cacheSet(CACHE_P,S.patients);cacheSet(CACHE_S,S.schedule);
+    S.sync='ok';
+  }catch{
+    S.sync='err';
+    if(!S.patients.length){S.patients=cp||[];S.schedule=cs||buildSch();}
+  }
+  S.loading=false;S.dirty=false;render();
+}
+
+// Debounced auto-save
+let saveTimer=null;
+function triggerSave(){
+  S.dirty=true;
+  // Save to cache immediately
+  cacheSet(CACHE_P,S.patients);
+  cacheSet(CACHE_S,S.schedule);
+  S.sync='saving';
+  clearTimeout(saveTimer);
+  saveTimer=setTimeout(()=>{
+    apiPost('patients',S.patients);
+    apiPost('schedule',S.schedule);
+    setTimeout(()=>{S.sync='ok';updateSyncBar();},1500);
+  },2000);
+  updateSyncBar();
+}
+
+function updateSyncBar(){
+  const bars=document.querySelectorAll('.syncbar');
+  const lbl={ok:'✓ Синхронизировано',saving:'⏳ Сохранение...',err:'⚠️ Ошибка — данные в кэше'};
+  bars.forEach(b=>{
+    b.className='syncbar '+S.sync;
+    const span=b.querySelector('.synclbl');
+    if(span)span.textContent=lbl[S.sync]||'';
+  });
+}
+
+async function savePats(arr,noRender){
+  S.patients=arr;
+  cacheSet(CACHE_P,arr);
+  if(!noRender)render();
+  triggerSave();
+}
+async function saveSch(sch){
+  S.schedule=sch;
+  cacheSet(CACHE_S,sch);
+  triggerSave();
+}
+
+// ---------- UTILS ----------
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+const today=()=>new Date().toISOString().split('T')[0];
+const fmtD=s=>s?new Date(s+' ').toLocaleDateString('ru-RU',{day:'numeric',month:'short'}):'—';
+const fmtF=s=>s?new Date(s+' ').toLocaleDateString('ru-RU',{day:'numeric',month:'long',year:'numeric'}):'';
+function calcAge(bd){
+  if(!bd)return null;
+  const b=new Date(bd),n=new Date();
+  let a=n.getFullYear()-b.getFullYear();
+  if(n.getMonth()<b.getMonth()||(n.getMonth()===b.getMonth()&&n.getDate()<b.getDate()))a--;
+  return a>=0?a:null;
+}
+function ageLabel(bd){const a=calcAge(bd);if(a===null)return'—';const s=a%10===1&&a%100!==11?'год':a%10>=2&&a%10<=4&&(a%100<10||a%100>=20)?'года':'лет';return a+' '+s;}
+
+const ST={
+  new:{l:'Новый',c:'#64748B'},
+  scheduled:{l:'Записан',c:'#2563EB'},
+  consulted:{l:'Принят',c:'#7C3AED'},
+  preop:{l:'Ждёт операции',c:'#D97706'},
+  operated:{l:'Прооперирован',c:'#059669'},
+  followup:{l:'Наблюдение',c:'#0891B2'},
+  completed:{l:'Завершён',c:'#94A3B8'}
+};
+const CT={callback:'Перезвонить',confirm:'Подтвердить запись',postop:'После операции',postvisit:'После приёма',schedule:'Записать на приём',review:'Попросить отзыв'};
+const SRC={instagram:'Instagram',telegram:'Telegram',site:'Сайт',yandex:'Яндекс',referral:'Направление',repeat:'Повторный',other:'Другое'};
+const CLINICS=['Основная клиника','Акфа Медлайн (Ташкент)','Другое'];
+
+function autoStatus(p){
+  // Auto-status logic based on filled fields
+  if(p.status==='completed')return p.status; // don't auto-change completed
+  if(p.opDate||p.opDateText){
+    if(p.status==='new'||p.status==='scheduled'||p.status==='consulted')return'preop';
+  }
+  if(p.outcome&&(p.status==='new'||p.status==='scheduled'))return'consulted';
+  return p.status;
+}
+
+function buildSch(){
+  const sch={},ts=['09:00','09:30','10:00','10:30','11:00','11:30','12:00','14:00','14:30','15:00','15:30','16:00','16:30'];
+  for(let i=0;i<28;i++){
+    const d=new Date();d.setDate(d.getDate()+i);
+    if(d.getDay()===0||d.getDay()===6)continue;
+    sch[d.toISOString().split('T')[0]]=ts.map(t=>({time:t,available:true,patientId:null,patientName:null,clinic:''}));
+  }
+  return sch;
+}
+function wDates(n=14){const r=[];for(let i=0;i<60;i++){const d=new Date();d.setDate(d.getDate()+i);if(d.getDay()!==0&&d.getDay()!==6)r.push(d.toISOString().split('T')[0]);if(r.length>=n)break;}return r;}
+
+// ---------- DOM HELPERS ----------
+let SCR={tab:'today',sub:null,schDate:null,editId:null,dview:'dashboard'};
+
+function h(tag,a,...kids){
+  const el=document.createElement(tag);
+  if(a)Object.entries(a).forEach(([k,v])=>{
+    if(k==='cls')el.className=v;
+    else if(k.startsWith('on')&&typeof v==='function')el.addEventListener(k.slice(2).toLowerCase(),v);
+    else if(k==='sty'&&typeof v==='object')Object.assign(el.style,v);
+    else if(k==='html')el.innerHTML=v;
+    else el.setAttribute(k,v);
+  });
+  kids.flat(9).forEach(c=>{if(c==null||c===false)return;el.appendChild(typeof c==='string'||typeof c==='number'?document.createTextNode(String(c)):c);});
+  return el;
+}
+
+function mkSyncBar(){
+  const lbl={ok:'✓ Синхронизировано',saving:'⏳ Сохранение...',err:'⚠️ Ошибка — данные в кэше'};
+  return h('div',{cls:'syncbar '+S.sync},h('span',{cls:'synclbl'},lbl[S.sync]||''),h('button',{onclick:()=>loadData()},'🔄 Обновить'));
+}
+
+function render(){
+  const app=document.getElementById('app');
+  app.innerHTML='';
+  if(!S.apiUrl){app.appendChild(renderSetup());return;}
+  if(S.loading&&!S.patients.length){app.appendChild(h('div',{cls:'loader'},'⏳ Загрузка...'));return;}
+  if(!S.role){app.appendChild(renderRoles());return;}
+  if(S.role==='assistant')app.appendChild(renderAssistant());
+  else if(S.role==='doctor')app.appendChild(renderDoctor());
+  else app.appendChild(renderWeb());
+}
+
+// ========== SETUP ==========
+function renderSetup(){
+  const inp=h('input',{cls:'fi',type:'url',placeholder:'https://script.google.com/macros/s/.../exec'});
+  const err=h('div',{sty:{color:'#DC2626',fontSize:13,marginBottom:12,display:'none',lineHeight:1.5}});
+  const btn=h('button',{cls:'btn bp bw',onclick:async()=>{
+    const url=inp.value.trim();if(!url)return;
+    btn.disabled=true;btn.textContent='Проверяем...';err.style.display='none';
+    try{
+      const r=await fetch(url+'?key=patients',{redirect:'follow'});
+      if(r.ok){S.apiUrl=url;localStorage.setItem(CFG,url);loadData();}else throw new Error();
+    }catch{err.style.display='block';err.textContent='Не удалось подключиться. Проверьте URL.';btn.disabled=false;btn.textContent='Подключить';}
+  }},'Подключить');
+  return h('div',{cls:'setup'},h('div',{cls:'setup-box'},
+    h('div',{sty:{fontSize:42,marginBottom:12}},'🔗'),
+    h('div',{sty:{fontSize:22,fontWeight:800,marginBottom:8}},'Подключение к базе данных'),
+    h('div',{sty:{fontSize:14,color:'#6B7280',marginBottom:20,lineHeight:1.6}},'Введите URL Google Apps Script. Приложение будет работать на любом устройстве.'),
+    h('div',{cls:'fg'},h('label',{cls:'fl'},'URL Apps Script'),inp),
+    err,btn,
+    h('div',{cls:'instr'},
+      h('b',{},'📋 Как настроить:'),h('br',{}),
+      '1. Откройте «Клиника Доктор Войнов» в Google Drive',h('br',{}),
+      '2. Расширения → Apps Script',h('br',{}),
+      '3. Вставьте код из apps-script.js → Сохранить',h('br',{}),
+      '4. Развернуть → Новое развёртывание',h('br',{}),
+      '5. Тип: Веб-приложение, Доступ: Все',h('br',{}),
+      '6. Развернуть → разрешить → скопировать URL'
+    )
+  ));
+}
+
+// ========== ROLES ==========
+function renderRoles(){
+  return h('div',{cls:'roles'},
+    h('div',{sty:{fontSize:46,marginBottom:10}},'🩺'),
+    h('div',{sty:{fontSize:22,fontWeight:800,color:'var(--p)',marginBottom:4}},'Доктор Войнов'),
+    h('div',{sty:{fontSize:12,color:'#059669',marginBottom:28}},'✓ Подключено · Google Sheets'),
+    ...[{k:'assistant',i:'📱',n:'Ассистент',d:'Пациенты, расписание, задачи'},{k:'doctor',i:'👨‍⚕️',n:'Доктор',d:'Карточки, операции, финансы'},{k:'web',i:'🌐',n:'Команда сайта',d:'Расписание и слоты для сайта'}].map(r=>
+      h('div',{cls:'role-card',onclick:()=>{S.role=r.k;SCR.tab='today';SCR.sub=null;render();}},
+        h('span',{sty:{fontSize:32}},r.i),
+        h('div',{},h('div',{sty:{fontSize:16,fontWeight:700}},r.n),h('div',{sty:{fontSize:12,color:'var(--mu)'}},r.d))
+      )
+    ),
+    h('button',{onclick:()=>{S.apiUrl='';localStorage.removeItem(CFG);render();},sty:{marginTop:20,background:'none',border:'none',color:'var(--hi)',fontSize:12,cursor:'pointer',fontFamily:'inherit'}},'Изменить подключение')
+  );
+}
+
+// ========== ASSISTANT ==========
+function renderAssistant(){
+  const td=today();
+  const allT=[];
+  S.patients.forEach(p=>(p.tasks||[]).forEach(t=>{if(!t.completed)allT.push({...t,pId:p.id,pName:p.name,pPhone:p.phone});}));
+  allT.sort((a,b)=>a.dueDate.localeCompare(b.dueDate));
+  const ov=allT.filter(t=>t.dueDate<td),tT=allT.filter(t=>t.dueDate===td),lT=allT.filter(t=>t.dueDate>td);
+  const pend=ov.length+tT.length;
+  const needC=S.patients.filter(p=>p.nextContact&&p.nextContact<=td);
+  const totalAlert=pend+needC.length;
+  const wrap=h('div',{sty:{display:'flex',flexDirection:'column',minHeight:'100vh',background:'var(--bg)'}});
+  const hdr=h('header',{cls:'hdr'},
+    h('div',{},h('div',{cls:'ht'},'🩺 Доктор Войнов'),h('div',{cls:'hs'},'Ассистент')),
+    h('button',{cls:'hb',onclick:()=>{S.role=null;render();}},'Выход'));
+
+  let content;
+  if(SCR.sub==='addpat')content=renderAddPatForm('assistant');
+  else if(SCR.sub==='pat'&&SCR.editId){const p=S.patients.find(x=>x.id===SCR.editId);content=renderPatDetail(p,'assistant');}
+  else if(SCR.tab==='today')content=renderToday(ov,tT,lT,needC);
+  else if(SCR.tab==='pats')content=renderPats('assistant');
+  else content=renderSched('assistant');
+
+  const nav=h('nav',{cls:'bn'},
+    ...[{k:'today',i:'✅',l:'Сегодня',b:totalAlert},{k:'pats',i:'👥',l:'Пациенты'},{k:'sched',i:'📅',l:'Расписание'}].map(t=>
+      h('button',{cls:'bt'+(SCR.tab===t.k&&!SCR.sub?' on':''),onclick:()=>{SCR.tab=t.k;SCR.sub=null;render();}},
+        h('span',{cls:'bti'},t.i),h('span',{cls:'btl'},t.l),t.b>0?h('span',{cls:'bdg'},t.b):null)
+    )
+  );
+  [hdr,mkSyncBar(),h('div',{cls:'scr'},content),nav].forEach(e=>wrap.appendChild(e));
+  return wrap;
+}
+
+function renderToday(ov,tT,lT,needC){
+  const f=document.createDocumentFragment();
+  f.appendChild(h('div',{sty:{fontSize:18,fontWeight:800,marginBottom:4}},'Задачи на сегодня'));
+  f.appendChild(h('div',{sty:{fontSize:13,color:'var(--mu)',marginBottom:12}},new Date().toLocaleDateString('ru-RU',{weekday:'long',day:'numeric',month:'long'})));
+  if(needC.length){
+    f.appendChild(h('div',{cls:'st',sty:{color:'var(--a)'}},'📞 Требуют контакта — '+needC.length));
+    needC.forEach(p=>{
+      f.appendChild(h('div',{cls:'crow',onclick:()=>{SCR.sub='pat';SCR.editId=p.id;render();}},
+        h('div',{cls:'av'},(p.name||'?')[0]),
+        h('div',{sty:{flex:1}},
+          h('div',{sty:{fontWeight:700}},p.name),
+          h('div',{sty:{fontSize:12,color:'var(--mu)'}},'📅 Контакт: '+fmtD(p.nextContact))
+        ),h('span',{sty:{color:'var(--mu)',fontSize:20}},'›')
+      ));
+    });
+  }
+  if(ov.length){f.appendChild(h('div',{cls:'st',sty:{color:'var(--r)'}},'⚠️ Просроченные — '+ov.length));ov.forEach(t=>f.appendChild(taskRow(t,true,false)));}
+  if(tT.length){f.appendChild(h('div',{cls:'st'},'📋 Сегодня — '+tT.length));tT.forEach(t=>f.appendChild(taskRow(t,false,false)));}
+  if(!ov.length&&!tT.length&&!needC.length)f.appendChild(h('div',{cls:'emp'},h('div',{cls:'empi'},'🎉'),h('div',{},'Нет срочных задач!')));
+  if(lT.length){f.appendChild(h('div',{cls:'st',sty:{marginTop:8}},'📌 Ближайшие'));lT.slice(0,8).forEach(t=>f.appendChild(taskRow(t,false,true)));}
+  return f;
+}
+
+function taskRow(t,urg,fut){
+  const chk=h('div',{cls:'chk',onclick:async e=>{
+    e.stopPropagation();
+    await savePats(S.patients.map(p=>p.id!==t.pId?p:{...p,tasks:(p.tasks||[]).map(tk=>tk.id!==t.id?tk:{...tk,completed:true,completedAt:new Date().toISOString()})}));
+  }});
+  return h('div',{cls:'tsk'+(urg?' urg':''),onclick:()=>{SCR.sub='pat';SCR.editId=t.pId;render();}},
+    chk,
+    h('div',{sty:{flex:1}},
+      h('div',{sty:{fontWeight:700,fontSize:14}},t.pName),
+      h('div',{sty:{fontSize:12,color:'var(--mu)'}},'📞 '+t.pPhone),
+      t.description?h('div',{sty:{fontSize:12,marginTop:2}},t.description):null,
+      h('span',{cls:'tag',sty:{marginTop:5,background:'var(--pll)',color:'var(--p)',display:'inline-block'}},CT[t.type]||t.type),
+      t.dueDate!==today()?h('div',{sty:{fontSize:11,color:fut?'var(--mu)':'var(--r)',marginTop:4}},'📅 '+fmtD(t.dueDate)):null
+    ));
+}
+
+function renderPats(role){
+  const wrap=h('div',{});
+  const hd=h('div',{sty:{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}},
+    h('div',{sty:{fontSize:18,fontWeight:800}},'Пациенты'),
+    h('button',{cls:'btn bp bsm',onclick:()=>{SCR.sub='addpat';render();}},'+ Добавить'));
+  const inp=h('input',{cls:'fi',placeholder:'Поиск...',sty:{marginBottom:14}});
+  const lst=h('div',{});
+  function draw(q){
+    lst.innerHTML='';
+    const fl=(q?S.patients.filter(p=>p.name.toLowerCase().includes(q.toLowerCase())||p.phone.includes(q)):[...S.patients]).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
+    if(!fl.length){lst.appendChild(h('div',{cls:'emp'},h('div',{cls:'empi'},'👤'),h('div',{},'Нет пациентов')));return;}
+    fl.forEach(p=>{
+      const s=ST[p.status];
+      lst.appendChild(h('div',{cls:'crow',onclick:()=>{SCR.sub='pat';SCR.editId=p.id;render();}},
+        h('div',{cls:'av'},(p.name||'?')[0]),
+        h('div',{sty:{flex:1}},
+          h('div',{sty:{fontWeight:700,fontSize:14}},p.name),
+          h('div',{sty:{fontSize:12,color:'var(--mu)'}},'📞 '+p.phone+(p.birthDate?' · '+ageLabel(p.birthDate):'')),
+          h('span',{cls:'tag',sty:{display:'inline-block',marginTop:3,background:(s?.c||'#ccc')+'22',color:s?.c||'#666'}},s?.l||p.status)
+        ),h('span',{sty:{color:'var(--mu)',fontSize:20}},'›')
+      ));
+    });
+  }
+  inp.addEventListener('input',e=>draw(e.target.value));draw('');
+  wrap.appendChild(hd);wrap.appendChild(inp);wrap.appendChild(lst);
+  return wrap;
+}
+
+function renderAddPatForm(){
+  const v={name:'',phone:'',source:'instagram',birthDate:'',complaint:''};
+  const nI=h('input',{cls:'fi',placeholder:'Иван Иванов'});nI.oninput=e=>v.name=e.target.value;
+  const phI=h('input',{cls:'fi',type:'tel',placeholder:'+7...'});phI.oninput=e=>v.phone=e.target.value;
+  const bdI=h('input',{cls:'fi',type:'date'});
+  const ageDisp=h('div',{sty:{fontSize:12,color:'var(--mu)',marginTop:4}});
+  bdI.oninput=e=>{v.birthDate=e.target.value;ageDisp.textContent=v.birthDate?'Возраст: '+ageLabel(v.birthDate):'';};
+  const sS=h('select',{cls:'fi'});Object.entries(SRC).forEach(([k,l])=>sS.appendChild(h('option',{value:k},l)));sS.oninput=e=>v.source=e.target.value;
+  const cI=h('textarea',{cls:'fi',placeholder:'Кратко...'});cI.oninput=e=>v.complaint=e.target.value;
+  return h('div',{},
+    h('button',{cls:'bbk',onclick:()=>{SCR.sub=null;render();}},'← Назад'),
+    h('div',{cls:'fg'},h('label',{cls:'fl'},'Имя и фамилия *'),nI),
+    h('div',{cls:'fg'},h('label',{cls:'fl'},'Телефон *'),phI),
+    h('div',{cls:'fg'},h('label',{cls:'fl'},'Дата рождения'),bdI,ageDisp),
+    h('div',{cls:'fg'},h('label',{cls:'fl'},'Источник'),sS),
+    h('div',{cls:'fg'},h('label',{cls:'fl'},'Жалоба'),cI),
+    h('button',{cls:'btn bp bw',onclick:async()=>{
+      if(!v.name.trim()||!v.phone.trim())return;
+      const p={id:uid(),name:nI.value.trim(),phone:phI.value.trim(),source:sS.value,birthDate:bdI.value,complaint:cI.value,tasks:[],notes:[],createdAt:new Date().toISOString(),status:'new'};
+      await savePats([...S.patients,p]);
+      SCR.sub=null;render();
+    }},'Добавить пациента')
+  );
+}
+
+// ========== PATIENT DETAIL ==========
+function renderPatDetail(p,role){
+  if(!p)return h('div',{},'Пациент не найден');
+  const active=(p.tasks||[]).filter(t=>!t.completed);
+  let curTab='info';
+  const tbEl=h('div',{cls:'tabs'});
+  const cEl=h('div',{});
+  function drawTab(){
+    cEl.innerHTML='';
+    tbEl.querySelectorAll('.tb').forEach(b=>b.className='tb '+(b.dataset.t===curTab?'on':'off'));
+    if(curTab==='info')cEl.appendChild(patInfo(p,role,cEl));
+    else if(curTab==='tasks')cEl.appendChild(patTasks(p,role,cEl));
+    else if(curTab==='notes')cEl.appendChild(patNotes(p,role));
+    else if(curTab==='edit')cEl.appendChild(patEditForm(p,role,cEl,drawTab));
+  }
+  const tabDefs=role==='assistant'?[['info','Инфо'],['tasks','Задачи ('+active.length+')'],['notes','Заметки'],['edit','Редактировать']]:[['info','Инфо'],['tasks','Задачи ('+active.length+')'],['notes','Заметки']];
+  tabDefs.forEach(([t,l])=>{const b=h('button',{cls:'tb '+(t===curTab?'on':'off')},l);b.dataset.t=t;b.onclick=()=>{curTab=t;drawTab();};tbEl.appendChild(b);});
+  drawTab();
+  const backFn=()=>{SCR.sub=null;SCR.editId=null;render();};
+  return h('div',{},
+    h('button',{cls:'bbk',onclick:backFn},'← Назад'),
+    h('div',{sty:{display:'flex',alignItems:'center',gap:12,marginBottom:16}},
+      h('div',{cls:'av',sty:{width:50,height:50,fontSize:20}},(p.name||'?')[0]),
+      h('div',{sty:{flex:1}},
+        h('div',{sty:{fontSize:18,fontWeight:800}},p.name),
+        h('div',{sty:{fontSize:13,color:'var(--mu)'}},'📞 '+p.phone+(p.birthDate?' · '+ageLabel(p.birthDate):''))
+      )
+    ),
+    // Quick action buttons
+    h('button',{cls:'book-btn',onclick:()=>{curTab='tasks';drawTab();SCR._bookMode=true;}},
+      '📅 Записать на приём'
+    ),
+    tbEl,cEl
+  );
+}
+
+function patInfo(p,role,container){
+  const s=ST[p.status];
+  const wrap=h('div',{});
+  const statusSel=h('select',{cls:'fi fis',sty:{marginBottom:12}});
+  Object.entries(ST).forEach(([k,v])=>{const o=h('option',{value:k},v.l);if(k===p.status)o.selected=true;statusSel.appendChild(o);});
+  statusSel.onchange=async e=>{
+    const up={...p,status:e.target.value};
+    await savePats(S.patients.map(pr=>pr.id===p.id?up:pr),true);
+    const np=S.patients.find(x=>x.id===p.id);
+    container.innerHTML='';container.appendChild(patInfo(np,role,container));
+  };
+
+  const rows=[
+    ['Статус',statusSel,true],
+    p.birthDate&&['Возраст',ageLabel(p.birthDate)],
+    p.birthDate&&['Дата рождения',fmtD(p.birthDate)],
+    ['Источник',SRC[p.source]||p.source||'—'],
+    ['Добавлен',fmtD(p.createdAt)],
+    p.complaint&&['Жалоба',p.complaint],
+    p.outcome&&['Итог приёма',p.outcome],
+    p.opDate&&['Операция',fmtD(p.opDate)],
+    p.opDateText&&!p.opDate&&['Операция',p.opDateText],
+    p.opPrice&&['Стоимость',Number(p.opPrice).toLocaleString('ru-RU')+' ₽'],
+    p.nextAppointment&&['Следующий приём',fmtD(p.nextAppointment)],
+    p.nextAppointmentText&&!p.nextAppointment&&['Следующий приём',p.nextAppointmentText],
+    p.nextContact&&['Контакт',fmtD(p.nextContact)],
+    p.doctorNote&&['Заметка врача',p.doctorNote],
+  ].filter(Boolean);
+
+  wrap.appendChild(h('div',{cls:'card'},
+    h('div',{cls:'fl'},'Статус'),
+    statusSel,
+    ...rows.filter(r=>r[2]!==true).map(([k,v])=>
+      h('div',{cls:'ir'},h('span',{cls:'ik'},k),typeof v==='string'?h('span',{cls:'iv'},v):h('span',{cls:'iv'},v))
+    )
+  ));
+  return wrap;
+}
+
+function patEditForm(p,role,cEl,drawTab){
+  const f={...p};
+  function fi(k,attrs={}){
+    let el;
+    if(attrs.tag==='textarea'){el=h('textarea',{cls:'fi',...attrs});el.textContent=f[k]||'';}
+    else if(attrs.tag==='select'){
+      el=h('select',{cls:'fi'});
+      Object.entries(ST).forEach(([k2,v])=>{const o=h('option',{value:k2},v.l);if(k2===f[k])o.selected=true;el.appendChild(o);});
+    }
+    else{el=h('input',{cls:'fi',...attrs,value:f[k]||''});}
+    el.addEventListener('input',e=>f[k]=e.target.value);
+    return el;
+  }
+  // Date + text pair
+  function dateFieldPair(key,textKey,label){
+    const dI=h('input',{cls:'fi',type:'date',value:f[key]||''});
+    const tI=h('input',{cls:'fi',type:'text',placeholder:'или текстом, напр. «начало мая»',value:f[textKey]||''});
+    dI.oninput=e=>f[key]=e.target.value;
+    tI.oninput=e=>f[textKey]=e.target.value;
+    return h('div',{cls:'fg'},h('label',{cls:'fl'},label),h('div',{cls:'datefield'},dI,tI));
+  }
+
+  const ageD=h('div',{sty:{fontSize:12,color:'var(--mu)',marginTop:4}},f.birthDate?'Возраст: '+ageLabel(f.birthDate):'');
+  const bdI=h('input',{cls:'fi',type:'date',value:f.birthDate||''});
+  bdI.oninput=e=>{f.birthDate=e.target.value;ageD.textContent=f.birthDate?'Возраст: '+ageLabel(f.birthDate):'';};
+
+  return h('div',{},
+    h('div',{cls:'fg'},h('label',{cls:'fl'},'Имя'),h('input',{cls:'fi',value:p.name,oninput:e=>f.name=e.target.value})),
+    h('div',{cls:'fg'},h('label',{cls:'fl'},'Телефон'),h('input',{cls:'fi',type:'tel',value:p.phone,oninput:e=>f.phone=e.target.value})),
+    h('div',{cls:'fg'},h('label',{cls:'fl'},'Дата рождения'),bdI,ageD),
+    h('div',{cls:'fg'},h('label',{cls:'fl'},'Источник'),fi('source',{tag:'select'})),
+    h('div',{cls:'fg'},h('label',{cls:'fl'},'Жалоба'),fi('complaint',{tag:'textarea'})),
+    h('div',{cls:'fg'},h('label',{cls:'fl'},'Итог приёма'),fi('outcome',{tag:'textarea',placeholder:'Назначения, диагноз...'})),
+    dateFieldPair('opDate','opDateText','Дата операции'),
+    h('div',{cls:'fg'},h('label',{cls:'fl'},'Стоимость (₽)'),fi('opPrice',{type:'number'})),
+    dateFieldPair('nextAppointment','nextAppointmentText','Следующий приём'),
+    h('div',{cls:'fg'},h('label',{cls:'fl'},'Дата контакта (ассистент)'),fi('nextContact',{type:'date'})),
+    h('div',{cls:'fg'},h('label',{cls:'fl'},'Заметка врача'),fi('doctorNote',{tag:'textarea'})),
+    h('div',{sty:{display:'flex',gap:8}},
+      h('button',{cls:'btn bp',sty:{flex:1},onclick:async()=>{
+        f.status=autoStatus(f);
+        await savePats(S.patients.map(pr=>pr.id===f.id?f:pr));
+        SCR.editId=f.id;render();
+      }},'Сохранить'),
+      h('button',{cls:'btn bs',onclick:()=>{curTab='info';drawTab();}},'Отмена')
+    )
+  );
+  var curTab='edit';
+}
+
+function patTasks(p,role,container){
+  const active=(p.tasks||[]).filter(t=>!t.completed);
+  const done=(p.tasks||[]).filter(t=>t.completed);
+  const wrap=h('div',{});
+  if(!active.length)wrap.appendChild(h('div',{cls:'emp',sty:{padding:'20px 0'}},h('div',{},'Нет задач')));
+  active.forEach(t=>{
+    const chk=h('div',{cls:'chk',onclick:async()=>{
+      await savePats(S.patients.map(pr=>pr.id!==p.id?pr:{...pr,tasks:(pr.tasks||[]).map(tk=>tk.id!==t.id?tk:{...tk,completed:true,completedAt:new Date().toISOString()})}));
+      const pp=S.patients.find(x=>x.id===p.id);container.innerHTML='';container.appendChild(patTasks(pp,role,container));
+    }});
+    wrap.appendChild(h('div',{cls:'tsk'},chk,h('div',{},
+      h('div',{sty:{fontWeight:700}},CT[t.type]||t.type),
+      t.description?h('div',{sty:{fontSize:12}},t.description):null,
+      h('div',{sty:{fontSize:12,color:'var(--mu)',marginTop:2}},'📅 '+fmtD(t.dueDate))
+    )));
+  });
+  // Add task
+  let showF=false;
+  const showB=h('button',{cls:'btn bs bw',sty:{marginTop:8},onclick:()=>{showF=true;rebF();}},'+  Добавить задачу');
+  const form=h('div',{cls:'card',sty:{marginTop:8,display:'none'}});
+  const ts=h('select',{cls:'fi'});Object.entries(CT).forEach(([k,v])=>ts.appendChild(h('option',{value:k},v)));
+  const di=h('input',{cls:'fi',type:'date',value:today()});
+  const desc=h('textarea',{cls:'fi',sty:{minHeight:60},placeholder:'Комментарий...'});
+  form.appendChild(h('div',{cls:'fg'},h('label',{cls:'fl'},'Тип'),ts));
+  form.appendChild(h('div',{cls:'fg'},h('label',{cls:'fl'},'Дата'),di));
+  form.appendChild(h('div',{cls:'fg'},h('label',{cls:'fl'},'Комментарий'),desc));
+  form.appendChild(h('div',{sty:{display:'flex',gap:8}},
+    h('button',{cls:'btn bp',sty:{flex:1},onclick:async()=>{
+      await savePats(S.patients.map(pr=>pr.id!==p.id?pr:{...pr,tasks:[...(pr.tasks||[]),{id:uid(),type:ts.value,dueDate:di.value,description:desc.value,completed:false,createdAt:new Date().toISOString()}]}));
+      const pp=S.patients.find(x=>x.id===p.id);container.innerHTML='';container.appendChild(patTasks(pp,role,container));
+    }},'Создать задачу'),
+    h('button',{cls:'btn bs',onclick:()=>{showF=false;rebF();}},'Отмена')
+  ));
+  function rebF(){showB.style.display=showF?'none':'flex';form.style.display=showF?'block':'none';}
+
+  // Book appointment shortcut
+  if(SCR._bookMode){showF=true;ts.value='schedule';rebF();SCR._bookMode=false;}
+
+  wrap.appendChild(showB);wrap.appendChild(form);
+  if(done.length){
+    wrap.appendChild(h('div',{cls:'st',sty:{marginTop:12}},'Выполненные — '+done.length));
+    done.forEach(t=>wrap.appendChild(h('div',{sty:{fontSize:13,color:'var(--mu)',padding:'6px 0',borderBottom:'1px solid var(--bd)',textDecoration:'line-through'}},CT[t.type]+' · '+fmtD(t.completedAt))));
+  }
+  return wrap;
+}
+
+function patNotes(p,role){
+  const wrap=h('div',{});
+  const notes=[...(p.notes||[])].reverse();
+  if(!notes.length)wrap.appendChild(h('div',{cls:'emp',sty:{padding:'20px 0'}},h('div',{},'Нет заметок')));
+  notes.forEach(n=>wrap.appendChild(h('div',{cls:'card',sty:{marginBottom:8}},
+    h('div',{sty:{fontSize:13}},n.text),
+    h('div',{sty:{fontSize:11,color:'var(--mu)',marginTop:4}},fmtF(n.createdAt)+' · '+(n.author||''))
+  )));
+  const ta=h('textarea',{cls:'fi',placeholder:'Добавить заметку...',sty:{marginBottom:8}});
+  wrap.appendChild(h('div',{sty:{marginTop:8}},ta,
+    h('button',{cls:'btn bp bw',onclick:async()=>{
+      if(!ta.value.trim())return;
+      await savePats(S.patients.map(pr=>pr.id!==p.id?pr:{...pr,notes:[...(pr.notes||[]),{id:uid(),text:ta.value,createdAt:new Date().toISOString(),author:S.role==='doctor'?'Доктор':'Ассистент'}]}));
+      const pp=S.patients.find(x=>x.id===p.id);const el=wrap.parentNode;el.innerHTML='';el.appendChild(patNotes(pp,role));
+    }},'Сохранить')
+  ));
+  return wrap;
+}
+
+// ========== SCHEDULE ==========
+function renderSched(role){
+  const wd=wDates();
+  if(!SCR.schDate||!wd.includes(SCR.schDate))SCR.schDate=wd[0];
+  const wrap=h('div',{});
+  wrap.appendChild(h('div',{sty:{fontSize:18,fontWeight:800,marginBottom:4}},'Расписание'));
+
+  const dr=h('div',{cls:'dr'});
+  const slWrap=h('div',{sty:{display:'flex',flexWrap:'wrap',gap:0}});
+  const detailWrap=h('div',{});
+
+  function rebDates(){
+    dr.innerHTML='';
+    wd.forEach(d=>{
+      const dd=new Date(d);
+      const fr=(S.schedule[d]||[]).filter(s=>s.available).length;
+      const total=(S.schedule[d]||[]).length;
+      const b=h('button',{cls:'dc'+(d===SCR.schDate?' on':''),onclick:()=>{SCR.schDate=d;rebSlots();}},
+        h('span',{cls:'dsb'},dd.toLocaleDateString('ru-RU',{weekday:'short'})),
+        dd.getDate(),
+        h('span',{cls:'dsb',sty:{color:d===SCR.schDate?'rgba(255,255,255,.75)':'var(--p)'}},fr+'/'+total)
+      );
+      dr.appendChild(b);
+    });
+  }
+
+  function rebSlots(){
+    dr.querySelectorAll('.dc').forEach((b,i)=>b.className='dc'+(wd[i]===SCR.schDate?' on':''));
+    slWrap.innerHTML='';detailWrap.innerHTML='';
+    const ss=S.schedule[SCR.schDate]||[];
+    const fr=ss.filter(s=>s.available).length;
+
+    // Summary
+    const summary=h('div',{sty:{fontSize:13,color:'var(--mu)',marginBottom:10}},
+      fmtF(SCR.schDate)+' · '+fr+' свободных · '+(ss.length-fr)+' занятых'
+    );
+    slWrap.appendChild(summary);
+
+    // Add slot button (assistant only)
+    if(role==='assistant'){
+      const addBtn=h('button',{cls:'btn bs bsm',sty:{marginBottom:10},onclick:()=>showAddSlot()},'+  Добавить слот');
+      slWrap.appendChild(addBtn);
+    }
+
+    // Slots grid
+    const grid=h('div',{sty:{display:'flex',flexWrap:'wrap'}});
+    ss.forEach(s=>{
+      const cls=s.available?'fr':(s.patientId?'bk':'cls');
+      const el=h('div',{cls:'slt '+cls},
+        s.time,
+        s.clinic?h('div',{cls:'slt-clinic'},s.clinic):null,
+        !s.available&&s.patientName?h('div',{sty:{fontSize:10}},s.patientName.split(' ')[0]):null
+      );
+      el.onclick=()=>showSlotDetail(s);
+      grid.appendChild(el);
+    });
+    slWrap.appendChild(grid);
+
+    function showSlotDetail(s){
+      detailWrap.innerHTML='';
+      const box=h('div',{cls:'card',sty:{marginTop:12}});
+      box.appendChild(h('div',{sty:{fontWeight:700,fontSize:15,marginBottom:12}},s.time+' · '+fmtD(SCR.schDate)));
+
+      if(role==='assistant'||role==='doctor'){
+        // Clinic selector
+        const clinicSel=h('select',{cls:'fi',sty:{marginBottom:10}});
+        clinicSel.appendChild(h('option',{value:''},'— Клиника не указана —'));
+        CLINICS.forEach(c=>{const o=h('option',{value:c},c);if(s.clinic===c)o.selected=true;clinicSel.appendChild(o);});
+        // Custom clinic input
+        const customInp=h('input',{cls:'fi',placeholder:'Или введите название клиники...',value:CLINICS.includes(s.clinic)?'':s.clinic||'',sty:{marginBottom:10}});
+        box.appendChild(h('div',{cls:'fg'},h('label',{cls:'fl'},'Клиника'),clinicSel,customInp));
+
+        // Toggle availability
+        if(s.available){
+          // Book patient
+          const patSel=h('select',{cls:'fi',sty:{marginBottom:10}});
+          patSel.appendChild(h('option',{value:''},'— Выберите пациента —'));
+          S.patients.forEach(p=>patSel.appendChild(h('option',{value:p.id},p.name+' — '+p.phone)));
+          box.appendChild(h('div',{cls:'fg'},h('label',{cls:'fl'},'Записать пациента'),patSel));
+          box.appendChild(h('div',{sty:{display:'flex',gap:8}},
+            h('button',{cls:'btn bp',sty:{flex:1},onclick:async()=>{
+              const clinic=clinicSel.value||customInp.value||'';
+              const pid=patSel.value;
+              let newSlot={...s,clinic,available:pid?false:true};
+              if(pid){const p=S.patients.find(x=>x.id===pid);newSlot.patientId=p.id;newSlot.patientName=p.name;
+                // Auto-status
+                const up=S.patients.map(pr=>pr.id!==pid?pr:{...pr,status:pr.status==='new'?'scheduled':pr.status});
+                await savePats(up,true);
+              }
+              const ns={...S.schedule,[SCR.schDate]:(S.schedule[SCR.schDate]||[]).map(sl=>sl.time!==s.time?sl:newSlot)};
+              await saveSch(ns);rebSlots();
+            }},pid?'Записать':'Сохранить клинику'),
+            h('button',{cls:'btn bs',onclick:async()=>{
+              const clinic=clinicSel.value||customInp.value||'';
+              const ns={...S.schedule,[SCR.schDate]:(S.schedule[SCR.schDate]||[]).map(sl=>sl.time!==s.time?sl:{...sl,available:false,clinic})};
+              await saveSch(ns);rebSlots();
+            },'style':''},role==='assistant'?'Закрыть слот':'Закрыть'),
+            h('button',{cls:'btn bs',onclick:()=>detailWrap.innerHTML=''},'Отмена')
+          ));
+        } else {
+          box.appendChild(s.patientName?h('div',{sty:{fontSize:14,marginBottom:10}},'👤 '+s.patientName):'');
+          box.appendChild(h('div',{sty:{display:'flex',gap:8}},
+            h('button',{cls:'btn bs',sty:{flex:1},onclick:async()=>{
+              const clinic=clinicSel.value||customInp.value||s.clinic||'';
+              const ns={...S.schedule,[SCR.schDate]:(S.schedule[SCR.schDate]||[]).map(sl=>sl.time!==s.time?sl:{...sl,available:true,patientId:null,patientName:null,clinic})};
+              await saveSch(ns);rebSlots();
+            }},'Освободить слот'),
+            h('button',{cls:'btn bs',onclick:async()=>{
+              const clinic=clinicSel.value||customInp.value||s.clinic||'';
+              const ns={...S.schedule,[SCR.schDate]:(S.schedule[SCR.schDate]||[]).map(sl=>sl.time!==s.time?sl:{...sl,clinic})};
+              await saveSch(ns);rebSlots();
+            }},'Сохранить клинику'),
+            h('button',{cls:'btn bs',onclick:()=>detailWrap.innerHTML=''},'Отмена')
+          ));
+        }
+      }
+      detailWrap.appendChild(box);
+    }
+
+    function showAddSlot(){
+      detailWrap.innerHTML='';
+      const box=h('div',{cls:'card',sty:{marginTop:12}});
+      const timeI=h('input',{cls:'fi',type:'time',value:'08:00',sty:{marginBottom:8}});
+      const clinicSel=h('select',{cls:'fi',sty:{marginBottom:8}});
+      clinicSel.appendChild(h('option',{value:''},'— Клиника не указана —'));
+      CLINICS.forEach(c=>clinicSel.appendChild(h('option',{value:c},c)));
+      const customInp=h('input',{cls:'fi',placeholder:'Или введите название...',sty:{marginBottom:8}});
+      box.appendChild(h('div',{sty:{fontWeight:700,marginBottom:12}},'Новый слот · '+fmtD(SCR.schDate)));
+      box.appendChild(h('div',{cls:'fg'},h('label',{cls:'fl'},'Время'),timeI));
+      box.appendChild(h('div',{cls:'fg'},h('label',{cls:'fl'},'Клиника'),clinicSel,customInp));
+      box.appendChild(h('div',{sty:{display:'flex',gap:8}},
+        h('button',{cls:'btn bp',sty:{flex:1},onclick:async()=>{
+          const t=timeI.value;if(!t)return;
+          const clinic=clinicSel.value||customInp.value||'';
+          const existing=S.schedule[SCR.schDate]||[];
+          if(existing.find(s=>s.time===t)){detailWrap.innerHTML='';detailWrap.appendChild(h('div',{cls:'alert red'},'Слот '+t+' уже существует'));return;}
+          const ns={...S.schedule,[SCR.schDate]:[...existing,{time:t,available:true,patientId:null,patientName:null,clinic}].sort((a,b)=>a.time.localeCompare(b.time))};
+          await saveSch(ns);rebSlots();
+        }},'Добавить'),
+        h('button',{cls:'btn bs',onclick:()=>detailWrap.innerHTML=''},'Отмена')
+      ));
+      detailWrap.appendChild(box);
+    }
+  }
+
+  rebDates();rebSlots();
+  wrap.appendChild(dr);wrap.appendChild(slWrap);wrap.appendChild(detailWrap);
+  return wrap;
+}
+
+// ========== DOCTOR ==========
+function renderDoctor(){
+  const td=today();
+  const todaySl=(S.schedule[td]||[]).filter(s=>!s.available&&s.patientId);
+  const needC=S.patients.filter(p=>p.nextContact&&p.nextContact<=td);
+  const upOps=S.patients.filter(p=>p.opDate&&p.opDate>=td).sort((a,b)=>a.opDate.localeCompare(b.opDate));
+  const wrap=h('div',{cls:'desktop'});
+  const sb=h('div',{cls:'sb'});
+  sb.appendChild(h('div',{sty:{marginBottom:20,paddingLeft:4}},
+    h('div',{sty:{fontSize:14,fontWeight:800,color:'var(--p)'}},'🩺 Доктор Войнов'),
+    h('div',{sty:{fontSize:10,color:'#059669',marginTop:4}},'✓ Google Sheets')
+  ));
+  const nav=[{k:'dashboard',i:'📊',l:'Дашборд'},{k:'patients',i:'👥',l:'Пациенты'},{k:'schedule',i:'📅',l:'Расписание'}];
+  nav.forEach(n=>{
+    const b=h('button',{cls:'si'+(SCR.dview===n.k&&!SCR.editId?' on':''),onclick:()=>{SCR.dview=n.k;SCR.editId=null;rebMain();}},h('span',{},n.i),n.l);
+    sb.appendChild(b);
+  });
+  sb.appendChild(h('div',{sty:{flex:1}}));
+  sb.appendChild(mkSyncBar());
+  sb.appendChild(h('button',{cls:'si',sty:{color:'var(--r)'},onclick:()=>{S.role=null;render();}},'🚪 Выход'));
+  const main=h('div',{cls:'dmain'});
+  function rebMain(){
+    sb.querySelectorAll('.si').forEach((b,i)=>{if(i<nav.length)b.className='si'+(nav[i].k===SCR.dview&&!SCR.editId?' on':'');});
+    main.innerHTML='';
+    if(SCR.editId){const p=S.patients.find(x=>x.id===SCR.editId);main.appendChild(docEditForm(p,rebMain));}
+    else if(SCR.dview==='dashboard')main.appendChild(docDash(todaySl,needC,upOps,td,rebMain));
+    else if(SCR.dview==='patients')main.appendChild(docPats(td,rebMain));
+    else{main.appendChild(h('h2',{sty:{fontSize:22,fontWeight:800,marginBottom:16}},'Расписание'));main.appendChild(renderSched('doctor'));}
+  }
+  rebMain();
+  wrap.appendChild(sb);wrap.appendChild(main);
+  return wrap;
+}
+
+function docDash(todaySl,needC,upOps,td,reb){
+  const wrap=h('div',{});
+  wrap.appendChild(h('h2',{sty:{fontSize:22,fontWeight:800,marginBottom:4}},'Дашборд'));
+  wrap.appendChild(h('div',{sty:{fontSize:13,color:'var(--mu)',marginBottom:20}},fmtF(td)));
+  wrap.appendChild(h('div',{cls:'sg'},
+    h('div',{cls:'sc',onclick:()=>{SCR.dview='patients';document.querySelector('.si')?.click();}},h('div',{cls:'sn'},S.patients.length),h('div',{cls:'sl'},'Пациентов')),
+    h('div',{cls:'sc'},h('div',{cls:'sn'},todaySl.length),h('div',{cls:'sl'},'Приёмов сегодня')),
+    h('div',{cls:'sc'},h('div',{cls:'sn',sty:{color:needC.length?'#D97706':'var(--p)'}},needC.length),h('div',{cls:'sl'},'К контакту'))
+  ));
+  if(todaySl.length){
+    wrap.appendChild(h('div',{cls:'st'},'Приёмы сегодня'));
+    todaySl.forEach(s=>{
+      const slot=s;
+      wrap.appendChild(h('div',{cls:'crow',onclick:()=>{SCR.editId=s.patientId;reb();}},
+        h('div',{sty:{fontWeight:800,fontSize:16,color:'var(--p)',width:44,textAlign:'center',flexShrink:0}},s.time),
+        h('div',{},
+          h('div',{sty:{fontWeight:600}},s.patientName),
+          s.clinic?h('div',{sty:{fontSize:11,color:'var(--mu)'}},s.clinic):null
+        )
+      ));
+    });
+  }
+  if(needC.length){
+    wrap.appendChild(h('div',{cls:'st',sty:{color:'#D97706'}},'⚠️ Требуют контакта ассистента'));
+    needC.forEach(p=>wrap.appendChild(h('div',{cls:'card',sty:{borderLeft:'3px solid #D97706',cursor:'pointer',padding:'10px 14px'},onclick:()=>{SCR.editId=p.id;reb();}},
+      h('div',{sty:{fontWeight:600}},p.name),
+      h('div',{sty:{fontSize:12,color:'var(--mu)'}},'📞 '+p.phone+' · '+fmtD(p.nextContact))
+    )));
+  }
+  if(upOps.length){
+    wrap.appendChild(h('div',{cls:'st'},'Предстоящие операции'));
+    upOps.slice(0,6).forEach(p=>wrap.appendChild(h('div',{cls:'crow',onclick:()=>{SCR.editId=p.id;reb();}},
+      h('div',{},
+        h('div',{sty:{fontWeight:600}},p.name),
+        h('div',{sty:{fontSize:12,color:'var(--mu)'}},'🗓 '+(p.opDate?fmtD(p.opDate):p.opDateText||'—')+(p.opPrice?' · '+Number(p.opPrice).toLocaleString('ru-RU')+' ₽':''))
+      )
+    )));
+  }
+  if(!S.patients.length)wrap.appendChild(h('div',{cls:'emp'},h('div',{cls:'empi'},'📋'),h('div',{},'Пациентов пока нет')));
+  return wrap;
+}
+
+function docPats(td,reb){
+  const wrap=h('div',{});
+  wrap.appendChild(h('h2',{sty:{fontSize:22,fontWeight:800,marginBottom:16}},'Пациенты'));
+  const inp=h('input',{cls:'fi',placeholder:'Поиск...',sty:{marginBottom:16}});
+  const tW=h('div',{cls:'card',sty:{padding:0,overflow:'hidden'}});
+  const inner=h('div',{sty:{overflowX:'auto'}});
+  function bld(q){
+    inner.innerHTML='';
+    const fl=(q?S.patients.filter(p=>p.name.toLowerCase().includes(q.toLowerCase())||p.phone.includes(q)):[...S.patients]).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
+    if(!fl.length){inner.appendChild(h('div',{cls:'emp'},h('div',{cls:'empi'},'👥'),h('div',{},'Нет пациентов')));return;}
+    const tbl=h('table',{cls:'tbl'});
+    tbl.appendChild(h('thead',{},h('tr',{},h('th',{},'Пациент'),h('th',{},'Статус'),h('th',{},'Операция'),h('th',{},'Цена'),h('th',{},'Контакт'))));
+    const tb=h('tbody',{});
+    fl.forEach(p=>{
+      const s=ST[p.status];
+      tb.appendChild(h('tr',{onclick:()=>{SCR.editId=p.id;reb();}},
+        h('td',{},h('div',{sty:{fontWeight:600}},p.name),h('div',{sty:{fontSize:11,color:'var(--mu)'}},p.phone+(p.birthDate?' · '+ageLabel(p.birthDate):'')),),
+        h('td',{},h('span',{cls:'tag',sty:{background:(s?.c||'#ccc')+'22',color:s?.c}},s?.l)),
+        h('td',{},p.opDate?fmtD(p.opDate):(p.opDateText||'—')),
+        h('td',{},p.opPrice?Number(p.opPrice).toLocaleString('ru-RU')+' ₽':'—'),
+        h('td',{sty:{color:p.nextContact&&p.nextContact<=td?'#D97706':'inherit'}},p.nextContact?fmtD(p.nextContact):'—')
+      ));
+    });
+    tbl.appendChild(tb);inner.appendChild(tbl);
+  }
+  inp.addEventListener('input',e=>bld(e.target.value));bld('');
+  tW.appendChild(inner);wrap.appendChild(inp);wrap.appendChild(tW);
+  return wrap;
+}
+
+function docEditForm(p,reb){
+  if(!p)return h('div',{},'Не найден');
+  const f={...p};
+  function fi(k,attrs={}){
+    let el;
+    if(attrs.tag==='textarea'){el=h('textarea',{cls:'fi',...attrs});el.textContent=f[k]||'';}
+    else if(attrs.tag==='select'){
+      el=h('select',{cls:'fi'});
+      Object.entries(ST).forEach(([k2,v])=>{const o=h('option',{value:k2},v.l);if(k2===f[k])o.selected=true;el.appendChild(o);});
+      el.value=f[k]||'new';
+    }
+    else{el=h('input',{cls:'fi',...attrs,value:f[k]||''});}
+    el.addEventListener('input',e=>f[k]=e.target.value);
+    return el;
+  }
+  function dateFieldPair(key,textKey,label){
+    const dI=h('input',{cls:'fi',type:'date',value:f[key]||''});
+    const tI=h('input',{cls:'fi',type:'text',placeholder:'или текстом: «в начале мая»',value:f[textKey]||''});
+    dI.oninput=e=>f[key]=e.target.value;tI.oninput=e=>f[textKey]=e.target.value;
+    return h('div',{cls:'fg'},h('label',{cls:'fl'},label),h('div',{cls:'datefield'},dI,tI));
+  }
+
+  const ageD=h('div',{sty:{fontSize:12,color:'var(--mu)',marginTop:4}},f.birthDate?'Возраст: '+ageLabel(f.birthDate):'');
+  const bdI=h('input',{cls:'fi',type:'date',value:f.birthDate||''});
+  bdI.oninput=e=>{f.birthDate=e.target.value;ageD.textContent=f.birthDate?'Возраст: '+ageLabel(f.birthDate):'';};
+
+  return h('div',{sty:{maxWidth:580}},
+    h('button',{cls:'bbk',onclick:()=>{SCR.editId=null;reb();}},'← К списку'),
+    h('h2',{sty:{fontSize:20,fontWeight:800,marginBottom:4}},p.name),
+    h('div',{sty:{fontSize:13,color:'var(--mu)',marginBottom:20}},'📞 '+p.phone+' · '+fmtD(p.createdAt)),
+    h('div',{cls:'fg'},h('label',{cls:'fl'},'Статус'),fi('status',{tag:'select'})),
+    h('div',{cls:'fg'},h('label',{cls:'fl'},'Итог приёма / Диагноз'),fi('outcome',{tag:'textarea',placeholder:'Назначения, диагноз...'})),
+    h('div',{cls:'fg'},h('label',{cls:'fl'},'Дата рождения'),bdI,ageD),
+    dateFieldPair('opDate','opDateText','Дата операции'),
+    h('div',{cls:'fg'},h('label',{cls:'fl'},'Стоимость (₽)'),fi('opPrice',{type:'number',placeholder:'0'})),
+    dateFieldPair('nextAppointment','nextAppointmentText','Следующий приём'),
+    h('div',{cls:'fg'},h('label',{cls:'fl'},'Дата контакта (ассистент)'),fi('nextContact',{type:'date'})),
+    h('div',{cls:'fg'},h('label',{cls:'fl'},'Заметка врача'),fi('doctorNote',{tag:'textarea',placeholder:'Клинические наблюдения...'})),
+    h('div',{sty:{display:'flex',gap:8,marginBottom:24}},
+      h('button',{cls:'btn bp',sty:{flex:1},onclick:async()=>{
+        f.status=autoStatus(f);
+        await savePats(S.patients.map(pr=>pr.id===f.id?f:pr));
+        SCR.editId=null;reb();
+      }},'Сохранить изменения'),
+      h('button',{cls:'btn bs',onclick:()=>{SCR.editId=null;reb();}},'Отмена')
+    ),
+    h('div',{sty:{borderTop:'1px solid var(--bd)',paddingTop:16}},
+      h('div',{sty:{fontWeight:700,marginBottom:12}},'Задачи ассистента'),
+      patTasks(p,'doctor',h('div',{}))
+    )
+  );
+}
+
+// ========== WEB ==========
+function renderWeb(){
+  const wd=wDates();
+  if(!SCR.schDate||!wd.includes(SCR.schDate))SCR.schDate=wd[0];
+  const wrap=h('div',{sty:{display:'flex',flexDirection:'column',minHeight:'100vh'}});
+  wrap.appendChild(h('header',{cls:'hdr'},h('div',{},h('div',{cls:'ht'},'🌐 Команда сайта'),h('div',{cls:'hs'},'doctorvoinov.ru')),h('button',{cls:'hb',onclick:()=>{S.role=null;render();}},'Выход')));
+  wrap.appendChild(mkSyncBar());
+  const tFr=(S.schedule[today()]||[]).filter(s=>s.available).length;
+  const tAll=(S.schedule[today()]||[]).length;
+  const scr=h('div',{cls:'scr',sty:{paddingBottom:16}});
+  scr.appendChild(h('div',{cls:'card',sty:{background:'var(--p)',border:'none',color:'#fff',marginBottom:16}},
+    h('div',{sty:{fontSize:12,opacity:.75}},'Свободных слотов сегодня'),
+    h('div',{sty:{fontSize:38,fontWeight:800,margin:'4px 0'}},tFr),
+    h('div',{sty:{fontSize:12,opacity:.6}},'из '+tAll+' всего')
+  ));
+  const dr=h('div',{cls:'dr'});
+  const slW=h('div',{cls:'card',sty:{marginTop:14}});
+  function bld(){
+    dr.innerHTML='';slW.innerHTML='';
+    wd.forEach(d=>{
+      const dd=new Date(d);
+      const fr=(S.schedule[d]||[]).filter(s=>s.available).length;
+      const b=h('button',{cls:'dc'+(d===SCR.schDate?' on':''),onclick:()=>{SCR.schDate=d;bld();}},
+        h('span',{cls:'dsb'},dd.toLocaleDateString('ru-RU',{weekday:'short'})),
+        dd.getDate(),
+        h('span',{cls:'dsb',sty:{color:d===SCR.schDate?'rgba(255,255,255,.8)':'var(--p)'}},fr+' св.')
+      );
+      dr.appendChild(b);
+    });
+    slW.appendChild(h('div',{sty:{fontWeight:700,marginBottom:10}},fmtF(SCR.schDate)));
+    const sw=h('div',{sty:{display:'flex',flexWrap:'wrap'}});
+    (S.schedule[SCR.schDate]||[]).forEach(s=>sw.appendChild(
+      h('div',{cls:'slt '+(s.available?'fr':'bk')},s.time,s.clinic?h('div',{cls:'slt-clinic'},s.clinic):null)
+    ));
+    slW.appendChild(sw);
+  }
+  bld();
+  const apiBtn=h('button',{cls:'btn bs bw',sty:{marginTop:12}},'{ } JSON API для сайта');
+  const apiB=h('div',{cls:'card',sty:{marginTop:10,display:'none'}});
+  apiBtn.onclick=()=>{
+    const shown=apiB.style.display!=='none';apiB.style.display=shown?'none':'block';
+    apiBtn.textContent=shown?'{ } JSON API для сайта':'Скрыть';
+    if(!shown){
+      const data={};
+      wd.forEach(d=>{const sl=(S.schedule[d]||[]).filter(s=>s.available).map(s=>({time:s.time,clinic:s.clinic||''}));data[d]={available_slots:sl,count:sl.length};});
+      apiB.innerHTML='';
+      apiB.appendChild(h('pre',{sty:{fontSize:11,overflowX:'auto',background:'#F5F4F0',padding:12,borderRadius:8,color:'#333',maxHeight:280}},JSON.stringify(data,null,2)));
+    }
+  };
+  [h('div',{cls:'st'},'По датам'),dr,slW,apiBtn,apiB].forEach(e=>scr.appendChild(e));
+  wrap.appendChild(scr);
+  return wrap;
+}
+
+// ========== INIT ==========
+window.addEventListener('focus',()=>{if(S.apiUrl&&!S.loading)loadData();});
+setInterval(()=>{if(S.apiUrl&&!S.loading&&S.role)loadData();},60000);
+if(S.apiUrl)loadData();else render();
+</script>
+</body>
+</html>
