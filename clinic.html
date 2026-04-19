@@ -374,7 +374,7 @@ function patCard(p,onClick){
 // ===================== PATIENT DETAIL =====================
 function renderPatDetail(p,role,onBack){
   if(!p)return h("div",{},"Пациент не найден");
-  let curTab="info";
+  let curTab=SCR.openTaskId?"tasks":"info";
   const tbEl=h("div",{cls:"tabs"});
   const cEl=h("div",{});
   const tabs=role==="web"?[["info","Инфо"]]:[["info","Инфо"],["tasks","Задачи"],["notes","Заметки"],["edit","Редактировать"]];
@@ -503,6 +503,11 @@ function makeTaskEl(t,p,role,wrap){
       }},"✓ Выполнено")
     )
   );
+  // Auto-expand if this is the task navigated from today tab
+  if(SCR.openTaskId&&t.id===SCR.openTaskId){
+    expanded=true;body.style.display="block";arrow.style.transform="rotate(90deg)";
+    setTimeout(()=>{el.scrollIntoView({behavior:"smooth",block:"center"});SCR.openTaskId=null;},200);
+  }
   el.appendChild(hdr);el.appendChild(body);
   return el;
 }
@@ -540,6 +545,25 @@ function patEditForm(p,role,onSaved){
   const ageD=h("div",{sty:{fontSize:12,color:"var(--mu)",marginTop:4}},f.birthDate?"Возраст: "+ageLabel(f.birthDate):"");
   const bdI=h("input",{cls:"fi",type:"date",value:f.birthDate||""});
   bdI.oninput=e=>{f.birthDate=e.target.value;ageD.textContent=f.birthDate?"Возраст: "+ageLabel(f.birthDate):"";};
+  const saveBtn=h("div",{sty:{display:"flex",gap:8}},
+    h("button",{cls:"btn bp",sty:{flex:1},onclick:async()=>{f.status=autoStatus(f);await savePats(S.patients.map(pr=>pr.id===f.id?f:pr));onSaved&&onSaved();}},"Сохранить"),
+    h("button",{cls:"btn bs",onclick:()=>onSaved&&onSaved()},"Отмена")
+  );
+  // Doctor sees simplified clinical form only
+  if(role==="doctor"){
+    return h("div",{},
+      h("div",{cls:"alert alert-warn",sty:{marginBottom:14}},"Кабинет врача: результат приёма. Полное редактирование — у ассистента."),
+      h("div",{cls:"fg"},h("label",{cls:"fl"},"Статус"),fi("status",{tag:"select"})),
+      h("div",{cls:"fg"},h("label",{cls:"fl"},"Итог приёма / Диагноз"),fi("outcome",{tag:"textarea",placeholder:"Назначения, диагноз, рекомендации..."})),
+      datePair("opDate","opDateText","Дата операции"),
+      h("div",{cls:"fg"},h("label",{cls:"fl"},"Стоимость (₽)"),fi("opPrice",{type:"number",placeholder:"0"})),
+      datePair("nextAppointment","nextAppointmentText","Следующий приём"),
+      h("div",{cls:"fg"},h("label",{cls:"fl"},"Дата контакта (ассистент)"),fi("nextContact",{type:"date"})),
+      h("div",{cls:"fg"},h("label",{cls:"fl"},"Заметка врача"),fi("doctorNote",{tag:"textarea",placeholder:"Видна только врачу..."})),
+      saveBtn
+    );
+  }
+  // Assistant / admin: full form
   return h("div",{},
     h("div",{cls:"fg"},h("label",{cls:"fl"},"Статус"),fi("status",{tag:"select"})),
     h("div",{cls:"fg"},h("label",{cls:"fl"},"Имя"),fi("name",{placeholder:"Имя пациента"})),
@@ -552,11 +576,7 @@ function patEditForm(p,role,onSaved){
     datePair("nextAppointment","nextAppointmentText","Следующий приём"),
     h("div",{cls:"fg"},h("label",{cls:"fl"},"Дата контакта (ассистент)"),fi("nextContact",{type:"date"})),
     h("div",{cls:"fg"},h("label",{cls:"fl"},"Заметка врача"),fi("doctorNote",{tag:"textarea"})),
-    h("div",{sty:{display:"flex",gap:8}},
-      h("button",{cls:"btn bp",sty:{flex:1},onclick:async()=>{f.status=autoStatus(f);await savePats(S.patients.map(pr=>pr.id===f.id?f:pr));onSaved&&onSaved();}},
-        "Сохранить"),
-      h("button",{cls:"btn bs",onclick:()=>onSaved&&onSaved()},"Отмена")
-    )
+    saveBtn
   );
 }
 
@@ -666,30 +686,63 @@ function renderSchedule(role){
     h("button",{cls:"btn bs bsm",onclick:()=>{SCR.schMonth++;if(SCR.schMonth>11){SCR.schMonth=0;SCR.schYear++;}rebAll();}},"→"),
     h("button",{cls:"btn bs bsm",onclick:()=>{const n=new Date();SCR.schYear=n.getFullYear();SCR.schMonth=n.getMonth();SCR.schDate=today();rebAll();}},"Сегодня")
   );
-  if(role==="admin"||role==="doctor"){
+  if(role!=="web"){
     mnav.appendChild(h("button",{cls:"btn ba bsm",onclick:()=>showCopyModal()},"📋 Копировать"));
   }
   wrap.appendChild(mnav);
-  const dr=h("div",{cls:"dr"});
+  const calWrap=h("div",{sty:{marginBottom:12}});
   const slWrap=h("div",{});
   const detWrap=h("div",{});
+  const tdStr=today();
 
   function rebDates(){
-    const wd=getMonthDates(SCR.schYear,SCR.schMonth);
-    monthLbl.textContent=new Date(SCR.schYear,SCR.schMonth).toLocaleDateString("ru-RU",{month:"long",year:"numeric"});
-    if(wd.length&&!wd.includes(SCR.schDate))SCR.schDate=wd[0];
-    dr.innerHTML="";
-    wd.forEach(d=>{
-      const dd=new Date(d);
-      const fr=(S.schedule[d]?.slots||[]).filter(s=>s.available).length;
-      const tot=(S.schedule[d]?.slots||[]).length;
-      const b=h("button",{cls:"dc"+(d===SCR.schDate?" on":""),onclick:()=>{SCR.schDate=d;rebSlots();}},
-        h("span",{cls:"dsb"},dd.toLocaleDateString("ru-RU",{weekday:"short"})),dd.getDate(),
-        h("span",{cls:"dsb",sty:{color:d===SCR.schDate?"rgba(255,255,255,.75)":"var(--p)"}},fr+"/"+tot)
+    const yr=SCR.schYear,mo=SCR.schMonth;
+    monthLbl.textContent=new Date(yr,mo).toLocaleDateString("ru-RU",{month:"long",year:"numeric"});
+    // Auto-select closest future working day in this month
+    const allDays=getMonthDates(yr,mo);
+    if(allDays.length&&!allDays.includes(SCR.schDate)){
+      SCR.schDate=allDays.find(d=>d>=tdStr)||allDays[allDays.length-1];
+    }
+    calWrap.innerHTML="";
+    // Weekday headers
+    const hRow=h("div",{sty:{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:3,marginBottom:4}});
+    ["Пн","Вт","Ср","Чт","Пт","Сб","Вс"].forEach(n=>
+      hRow.appendChild(h("div",{sty:{textAlign:"center",fontSize:10,fontWeight:700,color:"var(--mu)",padding:"2px 0"}},n))
+    );
+    calWrap.appendChild(hRow);
+    // Days grid
+    const grid=h("div",{sty:{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:3}});
+    const firstDow=new Date(yr,mo,1).getDay();
+    const offset=firstDow===0?6:firstDow-1;
+    for(let i=0;i<offset;i++)grid.appendChild(h("div",{}));
+    const daysInMonth=new Date(yr,mo+1,0).getDate();
+    for(let day=1;day<=daysInMonth;day++){
+      const d=new Date(yr,mo,day);
+      const dow=d.getDay();
+      const isWknd=dow===0||dow===6;
+      const ds=d.toISOString().split("T")[0];
+      const isPast=ds<tdStr;
+      const isSel=ds===SCR.schDate;
+      const isTdy=ds===tdStr;
+      const slots=S.schedule[ds]?.slots||[];
+      const fr=slots.filter(s=>s.available).length;
+      const tot=slots.length;
+      const inactive=isWknd||isPast;
+      const cell=h("div",{sty:{
+        padding:"6px 2px",borderRadius:"8px",textAlign:"center",
+        cursor:inactive?"default":"pointer",
+        background:isSel?"var(--p)":isTdy?"var(--pll)":"",
+        opacity:inactive?"0.28":"1",
+        border:isTdy&&!isSel?"1.5px solid var(--p)":"1.5px solid transparent",
+        transition:"background .1s"
+      }},
+        h("div",{sty:{fontSize:13,fontWeight:700,color:isSel?"#fff":isPast?"var(--hi)":"var(--tx)"}},day),
+        h("div",{sty:{fontSize:9,fontWeight:600,color:isSel?"rgba(255,255,255,.7)":tot>0?"var(--p)":"transparent",marginTop:1}},tot>0?fr+"/"+tot:"·")
       );
-      dr.appendChild(b);
-    });
-    setTimeout(()=>{const sel=dr.querySelector(".dc.on");if(sel)sel.scrollIntoView({block:"nearest",inline:"center"});},60);
+      if(!inactive){cell.onclick=()=>{SCR.schDate=ds;rebSlots();};}
+      grid.appendChild(cell);
+    }
+    calWrap.appendChild(grid);
   }
 
   function rebSlots(){
@@ -700,7 +753,7 @@ function renderSchedule(role){
     const fr=slots.filter(s=>s.available).length;
     slWrap.appendChild(h("div",{sty:{fontSize:13,color:"var(--mu)",marginBottom:10}},fmtF(SCR.schDate)+" · "+fr+" св. / "+slots.length+" всего"));
 
-    if(role==="admin"||role==="doctor"){
+    if(role!=="web"){
       const blks=day.blocks||[];
       if(blks.length){
         slWrap.appendChild(h("div",{cls:"st"},"Блоки работы"));
@@ -748,9 +801,7 @@ function renderSchedule(role){
       slWrap.appendChild(addBBtn);slWrap.appendChild(bForm);
     }
 
-    if(role==="assistant"){
-      slWrap.appendChild(h("button",{cls:"btn bs bsm",sty:{marginBottom:10},onclick:()=>showAddSlot()},"+  Добавить слот"));
-    }
+
 
     slWrap.appendChild(h("div",{cls:"st"},"Слоты"+(slots.length?" ("+slots.length+")":"")));
     if(!slots.length){slWrap.appendChild(h("div",{sty:{fontSize:13,color:"var(--mu)",padding:"10px 0"}},"Нет слотов. Добавьте блок работы."));}
@@ -881,7 +932,7 @@ function renderSchedule(role){
   }
 
   rebDates();rebSlots();
-  wrap.appendChild(dr);wrap.appendChild(slWrap);wrap.appendChild(detWrap);
+  wrap.appendChild(calWrap);wrap.appendChild(slWrap);wrap.appendChild(detWrap);
   return wrap;
 }
 // ===================== ADMIN PANEL =====================
@@ -1201,7 +1252,7 @@ function taskRowSimple(t,urg,fut){
     e.stopPropagation();
     await savePats(S.patients.map(p=>p.id!==t.pId?p:{...p,tasks:(p.tasks||[]).map(tk=>tk.id!==t.id?tk:{...tk,completed:true,completedAt:new Date().toISOString()})}));
   }},"✓");
-  const hdr=h("div",{cls:"task-hdr",onclick:()=>{SCR.sub="pat";SCR.editId=t.pId;render();}},
+  const hdr=h("div",{cls:"task-hdr",onclick:()=>{SCR.openTaskId=t.id;SCR.sub="pat";SCR.editId=t.pId;render();}},
     h("div",{sty:{flex:1}},
       h("div",{sty:{fontWeight:700,fontSize:14}},t.pName),
       h("div",{sty:{fontSize:12,color:"var(--mu)"}},"📞 "+t.pPhone),
