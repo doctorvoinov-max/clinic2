@@ -120,6 +120,11 @@ function apiPost(key,value){
   fetch(S.apiUrl,{method:"POST",headers:{"Content-Type":"text/plain"},body:JSON.stringify({token:TK,key,value:JSON.stringify(value)})}).catch(()=>{});
 }
 
+async function apiSend(key,value){
+  if(!S.apiUrl)return{ok:false};
+  try{const r=await fetch(S.apiUrl,{method:"POST",headers:{"Content-Type":"text/plain"},body:JSON.stringify({token:TK,key,value:JSON.stringify(value)})});const t=await r.text();return t?JSON.parse(t):{ok:true};}
+  catch{return{ok:false};}
+}
 let saveTimer=null;
 function triggerSave(keys){
   S.sync="saving";updateSyncBars();
@@ -170,8 +175,9 @@ function migrateSchedule(sch){
 // ===================== UTILS =====================
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
 const today=()=>new Date().toISOString().split("T")[0];
-const fmtD=s=>s?new Date(s+" ").toLocaleDateString("ru-RU",{day:"numeric",month:"short"}):"—";
-const fmtF=s=>s?new Date(s+" ").toLocaleDateString("ru-RU",{day:"numeric",month:"long",year:"numeric"}):"";
+const parseDate=s=>{if(!s)return null;const d=new Date(/^\d{4}-\d{2}-\d{2}$/.test(s)?s+"T12:00:00":s);return isNaN(d.getTime())?null:d;};
+const fmtD=s=>{const d=parseDate(s);return d?d.toLocaleDateString("ru-RU",{day:"numeric",month:"short"}):"—";};
+const fmtF=s=>{const d=parseDate(s);return d?d.toLocaleDateString("ru-RU",{day:"numeric",month:"long",year:"numeric"}):"—";};
 function calcAge(bd){if(!bd)return null;const b=new Date(bd),n=new Date();let a=n.getFullYear()-b.getFullYear();if(n.getMonth()<b.getMonth()||(n.getMonth()===b.getMonth()&&n.getDate()<b.getDate()))a--;return a>=0?a:null;}
 function ageLabel(bd){const a=calcAge(bd);if(a===null)return"—";const s=a%10===1&&a%100!==11?"год":a%10>=2&&a%10<=4&&(a%100<10||a%100>=20)?"года":"лет";return a+" "+s;}
 
@@ -202,10 +208,34 @@ function generateSlots(block){
   return slots;
 }
 function mergeSlots(existing,newSlots){
-  const times=new Set(existing.filter(s=>!s.available).map(s=>s.time));
-  const filtered=existing.filter(s=>!s.available);
+  // Keep ALL existing slots (available and booked), add new ones that don't conflict
+  const times=new Set(existing.map(s=>s.time));
   const toAdd=newSlots.filter(s=>!times.has(s.time));
-  return [...filtered,...toAdd].sort((a,b)=>a.time.localeCompare(b.time));
+  return [...existing,...toAdd].sort((a,b)=>a.time.localeCompare(b.time));
+}
+function getMonday(ds){
+  const d=new Date(ds+" ");const day=d.getDay();
+  d.setDate(d.getDate()+(day===0?-6:1-day));
+  return d.toISOString().split("T")[0];
+}
+function copyScheduleByWeek(srcDate,tFrom,tTo){
+  const srcMon=getMonday(srcDate);
+  const srcByDow={};
+  for(let i=0;i<7;i++){const d=new Date(srcMon+" ");d.setDate(d.getDate()+i);const ds=d.toISOString().split("T")[0];const dow=d.getDay();if(dow!==0&&dow!==6)srcByDow[dow]=S.schedule[ds]||{blocks:[],slots:[]};}
+  const ns={...S.schedule};let count=0;
+  const cur=new Date(tFrom+" ");const end=new Date(tTo+" ");
+  while(cur<=end){
+    const dow=cur.getDay();const ds=cur.toISOString().split("T")[0];
+    if(dow!==0&&dow!==6&&srcByDow[dow]?.blocks?.length){
+      const src=srcByDow[dow];
+      const newBlocks=src.blocks.map(b=>({...b,id:uid()}));
+      let newSlots=[];newBlocks.forEach(b=>newSlots=[...newSlots,...generateSlots(b)]);
+      const merged=mergeSlots(ns[ds]?.slots||[],newSlots);
+      ns[ds]={blocks:newBlocks,slots:merged};count++;
+    }
+    cur.setDate(cur.getDate()+1);
+  }
+  S.schedule=ns;triggerSave(["schedule"]);return count;
 }
 
 // ===================== DOM HELPER =====================
@@ -620,15 +650,34 @@ function showBookingModal(p){
 
 // ===================== SCHEDULE =====================
 function wDates(n){const r=[];for(let i=0;i<60;i++){const d=new Date();d.setDate(d.getDate()+i);if(d.getDay()!==0&&d.getDay()!==6)r.push(d.toISOString().split("T")[0]);if(r.length>=(n||14))break;}return r;}
+function getMonthDates(yr,mo){const r=[];const d=new Date(yr,mo,1);while(d.getMonth()===mo){if(d.getDay()!==0&&d.getDay()!==6)r.push(d.toISOString().split("T")[0]);d.setDate(d.getDate()+1);}return r;}
+
 function renderSchedule(role){
-  const wd=wDates(14);
-  if(!SCR.schDate||!wd.includes(SCR.schDate))SCR.schDate=wd[0];
+  if(SCR.schYear===undefined){const n=new Date();SCR.schYear=n.getFullYear();SCR.schMonth=n.getMonth();}
+  if(!SCR.schDate)SCR.schDate=today();
   const wrap=h("div",{});
-  wrap.appendChild(h("div",{sty:{fontSize:18,fontWeight:800,marginBottom:4}},"Расписание"));
+  wrap.appendChild(h("div",{sty:{fontSize:18,fontWeight:800,marginBottom:10}},"Расписание"));
+
+  // Month navigation
+  const monthLbl=h("span",{sty:{fontWeight:700,fontSize:15,flex:1,textAlign:"center"}});
+  const mnav=h("div",{sty:{display:"flex",alignItems:"center",gap:6,marginBottom:10}},
+    h("button",{cls:"btn bs bsm",onclick:()=>{SCR.schMonth--;if(SCR.schMonth<0){SCR.schMonth=11;SCR.schYear--;}rebAll();}},"←"),
+    monthLbl,
+    h("button",{cls:"btn bs bsm",onclick:()=>{SCR.schMonth++;if(SCR.schMonth>11){SCR.schMonth=0;SCR.schYear++;}rebAll();}},"→"),
+    h("button",{cls:"btn bs bsm",onclick:()=>{const n=new Date();SCR.schYear=n.getFullYear();SCR.schMonth=n.getMonth();SCR.schDate=today();rebAll();}},"Сегодня")
+  );
+  if(role==="admin"||role==="doctor"){
+    mnav.appendChild(h("button",{cls:"btn ba bsm",onclick:()=>showCopyModal()},"📋 Копировать"));
+  }
+  wrap.appendChild(mnav);
   const dr=h("div",{cls:"dr"});
   const slWrap=h("div",{});
   const detWrap=h("div",{});
+
   function rebDates(){
+    const wd=getMonthDates(SCR.schYear,SCR.schMonth);
+    monthLbl.textContent=new Date(SCR.schYear,SCR.schMonth).toLocaleDateString("ru-RU",{month:"long",year:"numeric"});
+    if(wd.length&&!wd.includes(SCR.schDate))SCR.schDate=wd[0];
     dr.innerHTML="";
     wd.forEach(d=>{
       const dd=new Date(d);
@@ -640,55 +689,56 @@ function renderSchedule(role){
       );
       dr.appendChild(b);
     });
+    setTimeout(()=>{const sel=dr.querySelector(".dc.on");if(sel)sel.scrollIntoView({block:"nearest",inline:"center"});},60);
   }
+
   function rebSlots(){
-    dr.querySelectorAll(".dc").forEach((b,i)=>b.className="dc"+(wd[i]===SCR.schDate?" on":""));
+    rebDates();
     slWrap.innerHTML="";detWrap.innerHTML="";
     const day=S.schedule[SCR.schDate]||{blocks:[],slots:[]};
     const slots=day.slots||[];
     const fr=slots.filter(s=>s.available).length;
     slWrap.appendChild(h("div",{sty:{fontSize:13,color:"var(--mu)",marginBottom:10}},fmtF(SCR.schDate)+" · "+fr+" св. / "+slots.length+" всего"));
-    // Admin/Doctor: block management
+
     if(role==="admin"||role==="doctor"){
       const blks=day.blocks||[];
       if(blks.length){
         slWrap.appendChild(h("div",{cls:"st"},"Блоки работы"));
         blks.forEach(blk=>{
           slWrap.appendChild(h("div",{cls:"block-card"},
-            h("div",{},h("b",{},blk.fromTime+" – "+blk.toTime),h("div",{sty:{fontSize:12,color:"var(--mu)"}},blk.clinic||"Клиника не указана")+" · "+blk.slotDuration+" мин/слот"),
+            h("div",{},
+              h("b",{},blk.fromTime+" – "+blk.toTime),
+              h("div",{sty:{fontSize:12,color:"var(--mu)"}},(blk.clinic||"Клиника не указана")+" · "+blk.slotDuration+" мин/слот")
+            ),
             h("button",{cls:"btn br bsm",onclick:async()=>{
-              const newBlocks=blks.filter(b=>b.id!==blk.id);
-              S.schedule={...S.schedule,[SCR.schDate]:{...day,blocks:newBlocks}};
+              const nb=(day.blocks||[]).filter(b=>b.id!==blk.id);
+              S.schedule={...S.schedule,[SCR.schDate]:{...day,blocks:nb}};
               triggerSave(["schedule"]);rebSlots();
             }},"Удалить")
           ));
         });
       }
-      // Add block form
       let showBF=false;
-      const addBBtn=h("button",{cls:"btn bs bsm",sty:{marginBottom:10},onclick:()=>{showBF=!showBF;rebBF();}},"+  Добавить блок приёма");
+      const addBBtn=h("button",{cls:"btn bs bsm",sty:{marginBottom:10},onclick:()=>{showBF=!showBF;rebBF();}},"+  Добавить блок");
       const bForm=h("div",{cls:"card",sty:{marginBottom:10,display:"none"}});
-      const fT=h("input",{cls:"fi",type:"time",value:"09:00",sty:{marginBottom:8}});
-      const tT=h("input",{cls:"fi",type:"time",value:"13:00",sty:{marginBottom:8}});
-      const cSel=h("select",{cls:"fi",sty:{marginBottom:8}});
-      cSel.appendChild(h("option",{value:""},"— Клиника —"));
-      CLINICS.forEach(c=>cSel.appendChild(h("option",{value:c},c)));
-      const cCustom=h("input",{cls:"fi",placeholder:"Или введите название...",sty:{marginBottom:8}});
-      const durI=h("input",{cls:"fi",type:"number",value:"30",placeholder:"Длительность слота, мин",sty:{marginBottom:8}});
+      const fT=h("input",{cls:"fi",type:"time",value:"09:00"});
+      const tT=h("input",{cls:"fi",type:"time",value:"13:00"});
+      const cSel=h("select",{cls:"fi"});cSel.appendChild(h("option",{value:""},"— Клиника —"));CLINICS.forEach(c=>cSel.appendChild(h("option",{value:c},c)));
+      const cC=h("input",{cls:"fi",placeholder:"Или введите название..."});
+      const durI=h("input",{cls:"fi",type:"number",value:"30",placeholder:"Мин/слот"});
       bForm.appendChild(h("div",{sty:{fontWeight:700,marginBottom:10}},"Новый блок: "+fmtD(SCR.schDate)));
       bForm.appendChild(h("div",{sty:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}},
-        h("div",{cls:"fg"},h("label",{cls:"fl"},"С"),fT),
-        h("div",{cls:"fg"},h("label",{cls:"fl"},"По"),tT)
-      ));
-      bForm.appendChild(h("div",{cls:"fg"},h("label",{cls:"fl"},"Место приёма"),cSel,cCustom));
+        h("div",{cls:"fg"},h("label",{cls:"fl"},"С"),fT),h("div",{cls:"fg"},h("label",{cls:"fl"},"По"),tT)));
+      bForm.appendChild(h("div",{cls:"fg"},h("label",{cls:"fl"},"Место приёма"),cSel,cC));
       bForm.appendChild(h("div",{cls:"fg"},h("label",{cls:"fl"},"Длительность слота (мин)"),durI));
       bForm.appendChild(h("div",{sty:{display:"flex",gap:8}},
         h("button",{cls:"btn bp",sty:{flex:1},onclick:async()=>{
-          const clinic=cSel.value||cCustom.value||"";
+          const clinic=cSel.value||cC.value||"";
           const newBlock={id:uid(),fromTime:fT.value,toTime:tT.value,clinic,slotDuration:parseInt(durI.value)||30};
           const newSlots=generateSlots(newBlock);
-          const merged=mergeSlots(slots,newSlots);
-          const newBlocks=[...(day.blocks||[]),newBlock];
+          const curDay=S.schedule[SCR.schDate]||{blocks:[],slots:[]};
+          const merged=mergeSlots(curDay.slots||[],newSlots);
+          const newBlocks=[...(curDay.blocks||[]),newBlock];
           S.schedule={...S.schedule,[SCR.schDate]:{blocks:newBlocks,slots:merged}};
           triggerSave(["schedule"]);showBF=false;rebSlots();
         }},"Добавить"),
@@ -697,13 +747,13 @@ function renderSchedule(role){
       function rebBF(){addBBtn.style.display=showBF?"none":"inline-flex";bForm.style.display=showBF?"block":"none";}
       slWrap.appendChild(addBBtn);slWrap.appendChild(bForm);
     }
-    // Assistant: add single slot
+
     if(role==="assistant"){
-      const addBtn=h("button",{cls:"btn bs bsm",sty:{marginBottom:10},onclick:()=>showAddSlot()},"+  Добавить слот");
-      slWrap.appendChild(addBtn);
+      slWrap.appendChild(h("button",{cls:"btn bs bsm",sty:{marginBottom:10},onclick:()=>showAddSlot()},"+  Добавить слот"));
     }
-    // Slots grid
-    slWrap.appendChild(h("div",{cls:"st"},"Слоты"));
+
+    slWrap.appendChild(h("div",{cls:"st"},"Слоты"+(slots.length?" ("+slots.length+")":"")));
+    if(!slots.length){slWrap.appendChild(h("div",{sty:{fontSize:13,color:"var(--mu)",padding:"10px 0"}},"Нет слотов. Добавьте блок работы."));}
     const grid=h("div",{sty:{display:"flex",flexWrap:"wrap"}});
     slots.forEach(s=>{
       const cls=s.available?"fr":(s.patientId?"bk":"cls");
@@ -716,6 +766,7 @@ function renderSchedule(role){
       grid.appendChild(el);
     });
     slWrap.appendChild(grid);
+
     function showSlotDetail(s){
       detWrap.innerHTML="";
       const box=h("div",{cls:"card",sty:{marginTop:12}});
@@ -728,12 +779,7 @@ function renderSchedule(role){
           s.clinic?h("div",{sty:{fontSize:12,color:"var(--mu)"}},"📍 "+s.clinic):null
         ));
         box.appendChild(h("div",{sty:{display:"flex",gap:8}},
-          pp?h("button",{cls:"btn bp",sty:{flex:1},onclick:()=>{
-            detWrap.innerHTML="";
-            // Open patient card inline below
-            const patCard=renderPatDetail(pp,role,()=>{detWrap.innerHTML="";});
-            detWrap.appendChild(patCard);
-          }},"Открыть карточку"):null,
+          pp?h("button",{cls:"btn bp",sty:{flex:1},onclick:()=>{detWrap.innerHTML="";detWrap.appendChild(renderPatDetail(pp,role,()=>detWrap.innerHTML=""));}},"Открыть карточку"):null,
           h("button",{cls:"btn bs",onclick:async()=>{
             const ns={...S.schedule,[SCR.schDate]:{...S.schedule[SCR.schDate],slots:(S.schedule[SCR.schDate]?.slots||[]).map(sl=>sl.id!==s.id?sl:{...sl,available:true,patientId:null,patientName:null,serviceId:null,serviceName:null})}};
             S.schedule=ns;triggerSave(["schedule"]);rebSlots();
@@ -744,7 +790,6 @@ function renderSchedule(role){
         box.appendChild(h("div",{sty:{fontSize:13,color:"var(--mu)",marginBottom:12}},"Слот свободен"+(s.clinic?" · "+s.clinic:"")));
         box.appendChild(h("div",{sty:{display:"flex",gap:8}},
           h("button",{cls:"btn bp",sty:{flex:1},onclick:async()=>{
-            // Close slot (mark unavailable)
             const ns={...S.schedule,[SCR.schDate]:{...S.schedule[SCR.schDate],slots:(S.schedule[SCR.schDate]?.slots||[]).map(sl=>sl.id!==s.id?sl:{...sl,available:false})}};
             S.schedule=ns;triggerSave(["schedule"]);rebSlots();
           }},"Закрыть слот"),
@@ -762,12 +807,13 @@ function renderSchedule(role){
       }
       detWrap.appendChild(box);
     }
+
     function showAddSlot(){
       detWrap.innerHTML="";
       const box=h("div",{cls:"card",sty:{marginTop:12}});
-      const tI=h("input",{cls:"fi",type:"time",value:"08:00",sty:{marginBottom:8}});
-      const cSel=h("select",{cls:"fi",sty:{marginBottom:8}});cSel.appendChild(h("option",{value:""},"— Клиника —"));CLINICS.forEach(c=>cSel.appendChild(h("option",{value:c},c)));
-      const cC=h("input",{cls:"fi",placeholder:"Или введите...",sty:{marginBottom:8}});
+      const tI=h("input",{cls:"fi",type:"time",value:"08:00"});
+      const cSel=h("select",{cls:"fi"});cSel.appendChild(h("option",{value:""},"— Клиника —"));CLINICS.forEach(c=>cSel.appendChild(h("option",{value:c},c)));
+      const cC=h("input",{cls:"fi",placeholder:"Или введите..."});
       box.appendChild(h("div",{sty:{fontWeight:700,marginBottom:10}},"Новый слот · "+fmtD(SCR.schDate)));
       box.appendChild(h("div",{cls:"fg"},h("label",{cls:"fl"},"Время"),tI));
       box.appendChild(h("div",{cls:"fg"},h("label",{cls:"fl"},"Клиника"),cSel,cC));
@@ -785,11 +831,59 @@ function renderSchedule(role){
       detWrap.appendChild(box);
     }
   }
+
+  function rebAll(){rebDates();rebSlots();}
+
+  function showCopyModal(){
+    let overlay;
+    function close(){if(overlay?.parentNode)overlay.parentNode.removeChild(overlay);}
+    const srcI=h("input",{cls:"fi",type:"date",value:SCR.schDate});
+    const fromI=h("input",{cls:"fi",type:"date",value:SCR.schDate});
+    const toI=h("input",{cls:"fi",type:"date"});
+    // Default to end of month
+    const lastDay=new Date(SCR.schYear,SCR.schMonth+1,0);
+    toI.value=lastDay.toISOString().split("T")[0];
+    const previewEl=h("div",{sty:{fontSize:13,color:"var(--mu)",marginTop:8}});
+    function updatePreview(){
+      if(!srcI.value||!fromI.value||!toI.value||fromI.value>toI.value){previewEl.textContent="";return;}
+      const srcMon=getMonday(srcI.value);
+      let count=0;const cur=new Date(fromI.value+" ");const end=new Date(toI.value+" ");
+      while(cur<=end){const dow=cur.getDay();const ds=cur.toISOString().split("T")[0];
+        if(dow!==0&&dow!==6){const srcD=new Date(srcMon+" ");srcD.setDate(srcD.getDate()+(dow===0?6:dow-1));const sds=srcD.toISOString().split("T")[0];if(S.schedule[sds]?.blocks?.length)count++;}
+        cur.setDate(cur.getDate()+1);}
+      previewEl.textContent="Будет скопировано блоков на "+count+" рабочих дней";
+    }
+    srcI.oninput=fromI.oninput=toI.oninput=updatePreview;
+    updatePreview();
+    const body=h("div",{cls:"modal"},
+      h("div",{sty:{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}},
+        h("div",{sty:{fontWeight:800,fontSize:18}},"Копировать расписание"),
+        h("button",{cls:"hb",sty:{background:"var(--bg)",color:"var(--tx)"},onclick:close},"✕")
+      ),
+      h("div",{cls:"alert alert-warn",sty:{marginBottom:16}},"Копирует блоки работы по дням недели. Понедельник → все понедельники периода, вторник → все вторники и т.д. Уже записанные пациенты не затрагиваются."),
+      h("div",{cls:"fg"},h("label",{cls:"fl"},"Образец (любой день исходной недели)"),srcI),
+      h("div",{sty:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}},
+        h("div",{cls:"fg"},h("label",{cls:"fl"},"Целевой период: с"),fromI),
+        h("div",{cls:"fg"},h("label",{cls:"fl"},"по"),toI)
+      ),
+      previewEl,
+      h("button",{cls:"btn bp bw",sty:{marginTop:12},onclick:async()=>{
+        if(!srcI.value||!fromI.value||!toI.value||fromI.value>toI.value)return;
+        const count=copyScheduleByWeek(srcI.value,fromI.value,toI.value);
+        close();rebAll();
+        const msg=h("div",{cls:"alert alert-ok",sty:{marginTop:8}},"✓ Скопировано на "+count+" дней");
+        slWrap.insertBefore(msg,slWrap.firstChild);
+        setTimeout(()=>msg.remove(),3000);
+      }},"Скопировать")
+    );
+    overlay=h("div",{cls:"overlay",onclick:e=>{if(e.target===overlay)close();}},body);
+    document.getElementById("app").appendChild(overlay);
+  }
+
   rebDates();rebSlots();
   wrap.appendChild(dr);wrap.appendChild(slWrap);wrap.appendChild(detWrap);
   return wrap;
 }
-
 // ===================== ADMIN PANEL =====================
 function renderAdminUsers(reb){
   const wrap=h("div",{});
@@ -834,7 +928,18 @@ function renderAdminUsers(reb){
       const email=eI.value.trim().toLowerCase();
       if(S.users.find(u=>u.email===email)){alert("Пользователь с таким email уже существует");return;}
       const nu={id:uid(),email,name:nI.value.trim(),role:rSel.value,passwordHash:null,active:true,createdAt:new Date().toISOString()};
-      S.users=[...S.users,nu];triggerSave(["users"]);showF=false;reb&&reb();
+      S.users=[...S.users,nu];triggerSave(["users"]);
+      // Send invite email
+      const appUrl=window.location.href.replace(/#.*$/,"");
+      const res=await apiSend("send_invite",{email:nu.email,name:nu.name,role:nu.role,roleName:ROLES[nu.role],appUrl});
+      showF=false;
+      // Show result
+      const note=h("div",{cls:"alert "+(res.ok?"alert-ok":"alert-warn"),sty:{marginTop:8}},
+        res.ok?"✓ Приглашение отправлено на "+nu.email:"Пользователь добавлен. Письмо не отправлено — проверьте, что Apps Script имеет доступ к Gmail."
+      );
+      form.parentNode.insertBefore(note,form.nextSibling);
+      setTimeout(()=>note.remove(),5000);
+      reb&&reb();
     }},"Добавить"),
     h("button",{cls:"btn bs",onclick:()=>{showF=false;rebF();}},"Отмена")
   ));
@@ -910,6 +1015,15 @@ function renderDoctor(){
     sb.appendChild(h("button",{cls:"si"+(SCR.dview===n.k&&!SCR.editId?" on":""),onclick:()=>{SCR.dview=n.k;SCR.editId=null;rebMain();}},h("span",{},n.i),n.l));
   });
   sb.appendChild(h("div",{sty:{flex:1}}));
+  // Role preview switcher (admin only)
+  if(isAdmin){
+    const prvSec=h("div",{sty:{borderTop:"1px solid var(--bd)",paddingTop:8,marginBottom:4}});
+    prvSec.appendChild(h("div",{sty:{fontSize:10,color:"var(--hi)",fontWeight:700,letterSpacing:".5px",textTransform:"uppercase",padding:"0 11px 4px"}},"Просмотр как"));
+    [{r:"doctor",i:"👨‍⚕️",l:"Врач"},{r:"assistant",i:"📱",l:"Ассистент"},{r:"web",i:"🌐",l:"Команда сайта"}].forEach(({r,i,l})=>{
+      prvSec.appendChild(h("button",{cls:"si",onclick:()=>{S._previewFrom=S.session.role;S.session={...S.session,role:r};SCR.tab="today";SCR.sub=null;render();}},h("span",{},i),l));
+    });
+    sb.appendChild(prvSec);
+  }
   sb.appendChild(mkSyncBar());
   sb.appendChild(h("button",{cls:"si",sty:{color:"var(--r)"},onclick:()=>{S.session=null;saveCfg();render();}},"🚪 Выход"));
   const main=h("div",{cls:"dmain"});
@@ -1056,7 +1170,14 @@ function renderAssistant(){
         h("span",{cls:"bti"},t.i),h("span",{cls:"btl"},t.l),t.b>0?h("span",{cls:"bdg"},t.b):null)
     )
   );
-  [hdr,mkSyncBar(),h("div",{cls:"scr"},content),nav].forEach(e=>wrap.appendChild(e));return wrap;
+  const els=[hdr,mkSyncBar(),h("div",{cls:"scr"},content),nav];
+  if(S._previewFrom){
+    els.unshift(h("div",{sty:{background:"#1A1A1A",color:"#fff",padding:"9px 18px",display:"flex",alignItems:"center",justifyContent:"space-between",fontSize:13,flexShrink:0}},
+      h("span",{},"👁 Просмотр: "+ROLES[S.session.role]),
+      h("button",{sty:{background:"var(--p)",border:"none",color:"#fff",padding:"5px 14px",borderRadius:7,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:700},onclick:()=>{S.session={...S.session,role:S._previewFrom};S._previewFrom=null;render();}},"← Назад в Admin")
+    ));
+  }
+  els.forEach(e=>wrap.appendChild(e));return wrap;
 }
 
 function renderToday(ov,tT,lT,needC){
@@ -1141,6 +1262,12 @@ function renderWeb(){
     if(!shown){const data={};wd.forEach(d=>{const sl=(S.schedule[d]?.slots||[]).filter(s=>s.available).map(s=>({time:s.time,clinic:s.clinic||""}));data[d]={available_slots:sl,count:sl.length};});apiB.innerHTML="";apiB.appendChild(h("pre",{sty:{fontSize:11,overflowX:"auto",background:"#F5F4F0",padding:12,borderRadius:8,color:"#333",maxHeight:280}},JSON.stringify(data,null,2)));}
   };
   [h("div",{cls:"st"},"По датам"),dr,slW,apiBtn,apiB].forEach(e=>scr.appendChild(e));
+  if(S._previewFrom){
+    wrap.insertBefore(h("div",{sty:{background:"#1A1A1A",color:"#fff",padding:"9px 18px",display:"flex",alignItems:"center",justifyContent:"space-between",fontSize:13}},
+      h("span",{},"👁 Просмотр: "+ROLES[S.session.role]),
+      h("button",{sty:{background:"var(--p)",border:"none",color:"#fff",padding:"5px 14px",borderRadius:7,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:700},onclick:()=>{S.session={...S.session,role:S._previewFrom};S._previewFrom=null;render();}},"← Назад в Admin")
+    ),wrap.firstChild);
+  }
   wrap.appendChild(scr);return wrap;
 }
 
