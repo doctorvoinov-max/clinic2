@@ -42,6 +42,7 @@ textarea.fi{min-height:72px;resize:vertical;font-size:14px}
 .task-done-btn{background:var(--pll);color:var(--p);border:none;border-radius:8px;padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;flex-shrink:0}
 .tag{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600}
 .slt{display:inline-flex;flex-direction:column;padding:7px 10px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid transparent;margin:3px;min-width:64px;text-align:center}
+@media(max-width:380px){.slt{min-width:54px;padding:6px 7px;font-size:11px}}
 .slt.fr{background:var(--pll);color:var(--p)}.slt.bk{background:#EEF2FF;color:#4F46E5}.slt.cls{background:#F3F4F6;color:var(--hi);cursor:default}
 .slt-name{font-size:9px;font-weight:500;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:74px}
 .dr{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin-bottom:14px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
@@ -126,21 +127,24 @@ async function apiSend(key,value){
   catch{return{ok:false};}
 }
 let saveTimer=null;
+let _pendingKeys=new Set();
 function triggerSave(keys){
   S.sync="saving";updateSyncBars();
+  keys.forEach(k=>_pendingKeys.add(k));
   if(keys.includes("patients"))cacheSet("patients",S.patients);
   if(keys.includes("schedule"))cacheSet("schedule",S.schedule);
   if(keys.includes("users"))cacheSet("users",S.users);
   if(keys.includes("services"))cacheSet("services",S.services);
+  // Users and services: save immediately (no debounce) to avoid race on reload
+  if(keys.includes("users"))apiPost("users",S.users);
+  if(keys.includes("services"))apiPost("services",S.services);
+  // Patients and schedule: debounced
   clearTimeout(saveTimer);
   saveTimer=setTimeout(()=>{
-    keys.forEach(k=>{
-      if(k==="patients")apiPost("patients",S.patients);
-      else if(k==="schedule")apiPost("schedule",S.schedule);
-      else if(k==="users")apiPost("users",S.users);
-      else if(k==="services")apiPost("services",S.services);
-    });
-    setTimeout(()=>{S.sync="ok";updateSyncBars();},1500);
+    if(_pendingKeys.has("patients"))apiPost("patients",S.patients);
+    if(_pendingKeys.has("schedule"))apiPost("schedule",S.schedule);
+    _pendingKeys.clear();
+    setTimeout(()=>{S.sync="ok";updateSyncBars();},1000);
   },2000);
 }
 function updateSyncBars(){
@@ -157,8 +161,9 @@ async function loadData(){
     const[p,s,u,sv]=await Promise.all([apiGet("patients"),apiGet("schedule"),apiGet("users"),apiGet("services")]);
     if(Array.isArray(p))S.patients=p;
     if(s&&typeof s==="object")S.schedule=migrateSchedule(s);
-    if(Array.isArray(u))S.users=u;
-    if(Array.isArray(sv))S.services=sv;
+    // Only overwrite users/services from API if no pending local save
+    if(Array.isArray(u)&&!_pendingKeys.has("users"))S.users=u;
+    if(Array.isArray(sv)&&!_pendingKeys.has("services"))S.services=sv;
     cacheSet("patients",S.patients);cacheSet("schedule",S.schedule);cacheSet("users",S.users);cacheSet("services",S.services);
     S.sync="ok";
   }catch{S.sync="err";}
@@ -214,16 +219,16 @@ function mergeSlots(existing,newSlots){
   return [...existing,...toAdd].sort((a,b)=>a.time.localeCompare(b.time));
 }
 function getMonday(ds){
-  const d=new Date(ds+" ");const day=d.getDay();
+  const d=new Date(ds+"T12:00:00");const day=d.getDay();
   d.setDate(d.getDate()+(day===0?-6:1-day));
   return d.toISOString().split("T")[0];
 }
 function copyScheduleByWeek(srcDate,tFrom,tTo){
   const srcMon=getMonday(srcDate);
   const srcByDow={};
-  for(let i=0;i<7;i++){const d=new Date(srcMon+" ");d.setDate(d.getDate()+i);const ds=d.toISOString().split("T")[0];const dow=d.getDay();if(dow!==0&&dow!==6)srcByDow[dow]=S.schedule[ds]||{blocks:[],slots:[]};}
+  for(let i=0;i<7;i++){const d=new Date(srcMon+"T12:00:00");d.setDate(d.getDate()+i);const ds=d.toISOString().split("T")[0];const dow=d.getDay();if(dow!==0&&dow!==6)srcByDow[dow]=S.schedule[ds]||{blocks:[],slots:[]};}
   const ns={...S.schedule};let count=0;
-  const cur=new Date(tFrom+" ");const end=new Date(tTo+" ");
+  const cur=new Date(tFrom+"T12:00:00");const end=new Date(tTo+"T12:00:00");
   while(cur<=end){
     const dow=cur.getDay();const ds=cur.toISOString().split("T")[0];
     if(dow!==0&&dow!==6&&srcByDow[dow]?.blocks?.length){
@@ -300,28 +305,25 @@ function renderLogin(){
   const err=h("div",{sty:{color:"#DC2626",fontSize:13,marginBottom:12,display:"none",lineHeight:1.5}});
   const btn=h("button",{cls:"btn bp bw",onclick:async()=>{
     const email=emailI.value.trim().toLowerCase(),pw=pwI.value;
-    if(!email||!pw){err.style.display="block";err.textContent="Введите почту и пароль";return;}
+    if(!email||!pw){err.style.display="block";err.textContent="Введите логин и пароль";return;}
     btn.disabled=true;btn.textContent="Вход...";err.style.display="none";
     const user=S.users.find(u=>u.email.toLowerCase()===email&&u.active!==false);
     if(!user){err.style.display="block";err.textContent="Пользователь не найден или доступ закрыт";btn.disabled=false;btn.textContent="Войти";return;}
-    if(!user.passwordHash){
-      // First login — set password
-      document.getElementById("app").innerHTML="";document.getElementById("app").appendChild(renderSetPassword(user));return;
-    }
+    if(!user.passwordHash){err.style.display="block";err.textContent="Пароль ещё не установлен. Обратитесь к администратору.";btn.disabled=false;btn.textContent="Войти";return;}
     const hash=await hashPw(pw);
     if(hash!==user.passwordHash){err.style.display="block";err.textContent="Неверный пароль";btn.disabled=false;btn.textContent="Войти";return;}
     S.session={userId:user.id,email:user.email,name:user.name,role:user.role};saveCfg();render();
   }},"Войти");
   // First run — no users at all
   const isFirstRun=S.users.length===0;
-  const firstRunNote=isFirstRun?h("div",{cls:"alert alert-warn",sty:{marginTop:16}},"Первый запуск. Введите почту и придумайте пароль — будет создан аккаунт администратора."):null;
   if(isFirstRun){
     btn.onclick=async()=>{
       const email=emailI.value.trim().toLowerCase(),pw=pwI.value;
-      if(!email||!pw||pw.length<4){err.style.display="block";err.textContent="Введите почту и пароль (мин. 4 символа)";return;}
+      if(!email||!pw||pw.length<4){err.style.display="block";err.textContent="Введите логин и пароль (мин. 4 символа)";return;}
+      btn.disabled=true;btn.textContent="Создаём...";
       const hash=await hashPw(pw);
       const newUser={id:uid(),email,name:"Администратор",role:"admin",passwordHash:hash,active:true,createdAt:new Date().toISOString()};
-      S.users=[newUser];await triggerSave(["users"]);
+      S.users=[newUser];cacheSet("users",S.users);apiPost("users",S.users);
       S.session={userId:newUser.id,email:newUser.email,name:newUser.name,role:newUser.role};saveCfg();render();
     };
     btn.textContent="Создать администратора";
@@ -330,32 +332,46 @@ function renderLogin(){
     h("div",{sty:{fontSize:40,marginBottom:12}},"🩺"),
     h("div",{sty:{fontSize:22,fontWeight:800,color:"var(--p)",marginBottom:4}},"Доктор Войнов"),
     h("div",{sty:{fontSize:13,color:"var(--mu)",marginBottom:28}},"doctorvoinov.ru"),
-    h("div",{cls:"fg"},h("label",{cls:"fl"},"Электронная почта"),emailI),
+    h("div",{cls:"fg"},h("label",{cls:"fl"},"Логин (email)"),emailI),
     h("div",{cls:"fg"},h("label",{cls:"fl"},"Пароль"),pwI),
-    err,btn,firstRunNote,
+    err,btn,
+    isFirstRun?h("div",{cls:"alert alert-warn",sty:{marginTop:16}},"Первый запуск. Введите любой email и придумайте пароль — будет создан аккаунт администратора."):null,
     h("button",{onclick:()=>{S.apiUrl="";saveCfg();render();},sty:{marginTop:20,background:"none",border:"none",color:"var(--hi)",fontSize:12,cursor:"pointer",fontFamily:"inherit",display:"block"}},"Изменить подключение")
   ));
 }
-function renderSetPassword(user){
-  const pw1=h("input",{cls:"fi",type:"password",placeholder:"Придумайте пароль"});
-  const pw2=h("input",{cls:"fi",type:"password",placeholder:"Повторите пароль"});
+
+// Change password screen — accessible from profile
+function renderChangePassword(user,onBack){
+  const pw0=h("input",{cls:"fi",type:"password",placeholder:"Текущий пароль"});
+  const pw1=h("input",{cls:"fi",type:"password",placeholder:"Новый пароль"});
+  const pw2=h("input",{cls:"fi",type:"password",placeholder:"Повторите новый пароль"});
   const err=h("div",{sty:{color:"#DC2626",fontSize:13,marginBottom:12,display:"none"}});
+  const ok=h("div",{cls:"alert alert-ok",sty:{marginBottom:12,display:"none"}},"✓ Пароль успешно изменён");
   const btn=h("button",{cls:"btn bp bw",onclick:async()=>{
-    if(pw1.value.length<4){err.style.display="block";err.textContent="Минимум 4 символа";return;}
+    err.style.display="none";ok.style.display="none";
+    if(!pw1.value||pw1.value.length<4){err.style.display="block";err.textContent="Новый пароль — минимум 4 символа";return;}
     if(pw1.value!==pw2.value){err.style.display="block";err.textContent="Пароли не совпадают";return;}
+    const h0=await hashPw(pw0.value);
+    if(h0!==user.passwordHash){err.style.display="block";err.textContent="Текущий пароль неверен";return;}
     const hash=await hashPw(pw1.value);
     S.users=S.users.map(u=>u.id===user.id?{...u,passwordHash:hash}:u);
+    // Update session with new hash reflected
+    const updUser=S.users.find(u=>u.id===user.id);
     triggerSave(["users"]);
-    S.session={userId:user.id,email:user.email,name:user.name,role:user.role};saveCfg();render();
-  }},"Установить пароль");
-  return h("div",{cls:"login-wrap"},h("div",{cls:"login-box"},
-    h("div",{sty:{fontSize:30,marginBottom:12}},"🔑"),
-    h("div",{sty:{fontSize:20,fontWeight:800,marginBottom:4}},"Первый вход"),
-    h("div",{sty:{fontSize:14,color:"var(--mu)",marginBottom:24}},"Добро пожаловать, "+user.name+"! Придумайте пароль для входа."),
+    ok.style.display="block";
+    pw0.value="";pw1.value="";pw2.value="";
+    setTimeout(()=>{ok.style.display="none";},3000);
+  }},"Изменить пароль");
+  const wrap=h("div",{sty:{maxWidth:400}},
+    h("button",{cls:"bbk",onclick:onBack},"← Назад"),
+    h("div",{sty:{fontSize:18,fontWeight:800,marginBottom:4}},"Смена пароля"),
+    h("div",{sty:{fontSize:13,color:"var(--mu)",marginBottom:20}},user.name+" · "+user.email),
+    h("div",{cls:"fg"},h("label",{cls:"fl"},"Текущий пароль"),pw0),
     h("div",{cls:"fg"},h("label",{cls:"fl"},"Новый пароль"),pw1),
-    h("div",{cls:"fg"},h("label",{cls:"fl"},"Повторите пароль"),pw2),
-    err,btn
-  ));
+    h("div",{cls:"fg"},h("label",{cls:"fl"},"Повторите"),pw2),
+    ok,err,btn
+  );
+  return wrap;
 }
 
 // ===================== SHARED COMPONENTS =====================
@@ -377,7 +393,8 @@ function renderPatDetail(p,role,onBack){
   let curTab=SCR.openTaskId?"tasks":"info";
   const tbEl=h("div",{cls:"tabs"});
   const cEl=h("div",{});
-  const tabs=role==="web"?[["info","Инфо"]]:[["info","Инфо"],["tasks","Задачи"],["notes","Заметки"],["edit","Редактировать"]];
+  const activeCnt=(p.tasks||[]).filter(t=>!t.completed).length;
+  const tabs=role==="web"?[["info","Инфо"]]:[["info","Инфо"],["tasks","Задачи"+(activeCnt>0?" ("+activeCnt+")":"")],["notes","Заметки"],["edit","Редактировать"]];
   function drawTab(t){
     curTab=t||curTab;
     cEl.innerHTML="";
@@ -408,7 +425,7 @@ function patInfo(p,role){
   const s=ST[p.status];
   const statusSel=h("select",{cls:"fi",sty:{marginBottom:12}});
   Object.entries(ST).forEach(([k,v])=>{const o=h("option",{value:k},v.l);if(k===p.status)o.selected=true;statusSel.appendChild(o);});
-  statusSel.onchange=async e=>{await savePats(S.patients.map(pr=>pr.id!==p.id?pr:{...pr,status:e.target.value}));};
+  statusSel.onchange=async e=>{await savePats(S.patients.map(pr=>pr.id!==p.id?pr:{...pr,status:e.target.value}),true);};
   const rows=[
     p.birthDate&&["Дата рождения",fmtD(p.birthDate)+(p.birthDate?" ("+ageLabel(p.birthDate)+")":"")],
     ["Источник",SRC[p.source]||p.source||"—"],
@@ -453,7 +470,7 @@ function rebuildTasks(wrap,p,role){
   form.appendChild(h("div",{sty:{display:"flex",gap:8}},
     h("button",{cls:"btn bp",sty:{flex:1},onclick:async()=>{
       const newTask={id:uid(),type:ts.value,dueDate:di.value,description:desc.value,completed:false,createdAt:new Date().toISOString()};
-      await savePats(S.patients.map(pr=>pr.id!==pp.id?pr:{...pr,tasks:[...(pr.tasks||[]),newTask]}));
+      await savePats(S.patients.map(pr=>pr.id!==pp.id?pr:{...pr,tasks:[...(pr.tasks||[]),newTask]}),true);
       rebuildTasks(wrap,S.patients.find(x=>x.id===pp.id),role);
     }},"Создать задачу"),
     h("button",{cls:"btn bs",onclick:()=>{showF=false;rebForm();}},"Отмена")
@@ -480,7 +497,7 @@ function makeTaskEl(t,p,role,wrap){
     ),
     h("button",{cls:"task-done-btn",onclick:async e=>{
       e.stopPropagation();
-      await savePats(S.patients.map(pr=>pr.id!==p.id?pr:{...pr,tasks:(pr.tasks||[]).map(tk=>tk.id!==t.id?tk:{...tk,completed:true,completedAt:new Date().toISOString()})}));
+      await savePats(S.patients.map(pr=>pr.id!==p.id?pr:{...pr,tasks:(pr.tasks||[]).map(tk=>tk.id!==t.id?tk:{...tk,completed:true,completedAt:new Date().toISOString()})}),true);
       rebuildTasks(wrap,S.patients.find(x=>x.id===p.id),role);
     }},"✓ Готово")
   );
@@ -494,11 +511,11 @@ function makeTaskEl(t,p,role,wrap){
     h("div",{cls:"fg"},h("label",{cls:"fl"},"Статус пациента"),statusSel),
     h("div",{sty:{display:"flex",gap:8}},
       h("button",{cls:"btn bp",sty:{flex:1},onclick:async()=>{
-        await savePats(S.patients.map(pr=>pr.id!==p.id?pr:{...pr,status:statusSel.value,tasks:(pr.tasks||[]).map(tk=>tk.id!==t.id?tk:{...tk,comment:commentTA.value})}));
+        await savePats(S.patients.map(pr=>pr.id!==p.id?pr:{...pr,status:statusSel.value,tasks:(pr.tasks||[]).map(tk=>tk.id!==t.id?tk:{...tk,comment:commentTA.value})}),true);
         rebuildTasks(wrap,S.patients.find(x=>x.id===p.id),role);
       }},"Сохранить"),
       h("button",{cls:"btn bs",onclick:async()=>{
-        await savePats(S.patients.map(pr=>pr.id!==p.id?pr:{...pr,tasks:(pr.tasks||[]).map(tk=>tk.id!==t.id?tk:{...tk,completed:true,comment:commentTA.value,completedAt:new Date().toISOString()})}));
+        await savePats(S.patients.map(pr=>pr.id!==p.id?pr:{...pr,tasks:(pr.tasks||[]).map(tk=>tk.id!==t.id?tk:{...tk,completed:true,comment:commentTA.value,completedAt:new Date().toISOString()})}),true);
         rebuildTasks(wrap,S.patients.find(x=>x.id===p.id),role);
       }},"✓ Выполнено")
     )
@@ -520,8 +537,9 @@ function patNotes(p,role){
   const ta=h("textarea",{cls:"fi",placeholder:"Добавить заметку...",sty:{marginBottom:8}});
   wrap.appendChild(h("div",{sty:{marginTop:8}},ta,h("button",{cls:"btn bp bw",onclick:async()=>{
     if(!ta.value.trim())return;
-    await savePats(S.patients.map(pr=>pr.id!==p.id?pr:{...pr,notes:[...(pr.notes||[]),{id:uid(),text:ta.value,createdAt:new Date().toISOString(),author:S.session?.name||S.session?.role||""}]}));
-    const w=wrap.parentNode;w.innerHTML="";w.appendChild(patNotes(S.patients.find(x=>x.id===p.id),role));
+    await savePats(S.patients.map(pr=>pr.id!==p.id?pr:{...pr,notes:[...(pr.notes||[]),{id:uid(),text:ta.value,createdAt:new Date().toISOString(),author:S.session?.name||S.session?.role||""}]}),true);
+    ta.value="";
+    const w=wrap.parentNode;if(w){w.innerHTML="";w.appendChild(patNotes(S.patients.find(x=>x.id===p.id),role));}
   }},"Сохранить")));
   return wrap;
 }
@@ -546,7 +564,7 @@ function patEditForm(p,role,onSaved){
   const bdI=h("input",{cls:"fi",type:"date",value:f.birthDate||""});
   bdI.oninput=e=>{f.birthDate=e.target.value;ageD.textContent=f.birthDate?"Возраст: "+ageLabel(f.birthDate):"";};
   const saveBtn=h("div",{sty:{display:"flex",gap:8}},
-    h("button",{cls:"btn bp",sty:{flex:1},onclick:async()=>{f.status=autoStatus(f);await savePats(S.patients.map(pr=>pr.id===f.id?f:pr));onSaved&&onSaved();}},"Сохранить"),
+    h("button",{cls:"btn bp",sty:{flex:1},onclick:async()=>{f.status=autoStatus(f);await savePats(S.patients.map(pr=>pr.id===f.id?f:pr),true);onSaved&&onSaved();}},"Сохранить"),
     h("button",{cls:"btn bs",onclick:()=>onSaved&&onSaved()},"Отмена")
   );
   // Doctor sees simplified clinical form only
@@ -563,12 +581,17 @@ function patEditForm(p,role,onSaved){
       saveBtn
     );
   }
+  // Source select helper for full form
+  const srcSel=h("select",{cls:"fi"});
+  Object.entries(SRC).forEach(([k,v])=>{const o=h("option",{value:k},v);if(k===f.source)o.selected=true;srcSel.appendChild(o);});
+  srcSel.onchange=e=>f.source=e.target.value;
   // Assistant / admin: full form
   return h("div",{},
     h("div",{cls:"fg"},h("label",{cls:"fl"},"Статус"),fi("status",{tag:"select"})),
     h("div",{cls:"fg"},h("label",{cls:"fl"},"Имя"),fi("name",{placeholder:"Имя пациента"})),
     h("div",{cls:"fg"},h("label",{cls:"fl"},"Телефон"),fi("phone",{type:"tel"})),
     h("div",{cls:"fg"},h("label",{cls:"fl"},"Дата рождения"),bdI,ageD),
+    h("div",{cls:"fg"},h("label",{cls:"fl"},"Источник"),srcSel),
     h("div",{cls:"fg"},h("label",{cls:"fl"},"Жалоба"),fi("complaint",{tag:"textarea"})),
     h("div",{cls:"fg"},h("label",{cls:"fl"},"Итог приёма / Диагноз"),fi("outcome",{tag:"textarea",placeholder:"Назначения, диагноз..."})),
     datePair("opDate","opDateText","Дата операции"),
@@ -583,12 +606,13 @@ function patEditForm(p,role,onSaved){
 // ===================== BOOKING MODAL =====================
 function showBookingModal(p){
   const wd=wDates(14);
-  let selDate=wd[0],selSlot=null,selSvc=null,customDur=null;
+  let selDate=wd[0],selSlot=null,selSvc=null,customDur=null,showNewSvcFlag=false;
   let overlay;
   function close(){if(overlay&&overlay.parentNode)overlay.parentNode.removeChild(overlay);}
   function build(){
     if(overlay&&overlay.parentNode)overlay.parentNode.removeChild(overlay);
-    const slots=(S.schedule[selDate]?.slots||[]).filter(s=>s.available);
+    const nowHHMM=(()=>{const n=new Date();return String(n.getHours()).padStart(2,"0")+":"+String(n.getMinutes()).padStart(2,"0");})();
+    const slots=(S.schedule[selDate]?.slots||[]).filter(s=>s.available&&(selDate!==today()||s.time>nowHHMM));
     const body=h("div",{cls:"modal"});
     body.appendChild(h("div",{sty:{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}},
       h("div",{sty:{fontWeight:800,fontSize:18}},"Записать на приём"),
@@ -618,34 +642,35 @@ function showBookingModal(p){
     // Service
     body.appendChild(h("div",{cls:"fg"},h("label",{cls:"fl"},"Услуга"),
       h("select",{cls:"fi",onchange:e=>{
-        if(e.target.value==="__new__"){selSvc=null;build();}
-        else{selSvc=S.services.find(s=>s.id===e.target.value)||null;customDur=selSvc?.duration||null;build();}
+        if(e.target.value==="__new__"){selSvc=null;showNewSvcFlag=true;build();}
+        else{selSvc=S.services.find(s=>s.id===e.target.value)||null;customDur=selSvc?.duration||null;showNewSvcFlag=false;build();}
       }},
         h("option",{value:""},"— Выберите услугу —"),
         ...S.services.map(sv=>{const o=h("option",{value:sv.id},sv.name+(sv.price?" · "+Number(sv.price).toLocaleString("ru-RU")+" ₽":""));if(selSvc?.id===sv.id)o.selected=true;return o;}),
-        h("option",{value:"__new__"},"+ Создать новую услугу...")
+        h("option",{value:"__new__",selected:showNewSvcFlag},"+ Создать новую услугу...")
       )
     ));
-    // New service inline form
-    const showNewSvc=!selSvc&&S.services.length>0?false:false; // just show if explicitly chosen
-    const newSvcWrap=h("div",{cls:"card",sty:{marginBottom:12}});
-    newSvcWrap.appendChild(h("div",{sty:{fontWeight:700,marginBottom:10}},"Новая услуга"));
-    const svcName=h("input",{cls:"fi",placeholder:"Название услуги",sty:{marginBottom:8}});
-    const svcPrice=h("input",{cls:"fi",type:"number",placeholder:"Стоимость, ₽",sty:{marginBottom:8}});
-    const svcDur=h("input",{cls:"fi",type:"number",placeholder:"Длительность, мин",sty:{marginBottom:8}});
-    newSvcWrap.appendChild(h("div",{cls:"fg"},h("label",{cls:"fl"},"Название *"),svcName));
-    newSvcWrap.appendChild(h("div",{sty:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}},
-      h("div",{cls:"fg"},h("label",{cls:"fl"},"Стоимость (₽)"),svcPrice),
-      h("div",{cls:"fg"},h("label",{cls:"fl"},"Длительность (мин)"),svcDur)
-    ));
-    newSvcWrap.appendChild(h("button",{cls:"btn bs bsm",onclick:()=>{
-      if(!svcName.value.trim())return;
-      const sv={id:uid(),name:svcName.value.trim(),price:svcPrice.value||"",duration:parseInt(svcDur.value)||30};
-      S.services=[...S.services,sv];triggerSave(["services"]);
-      selSvc=sv;customDur=sv.duration;build();
-    }},"Создать услугу"));
-    // Show new service form if no services or __new__ selected
-    if(S.services.length===0){body.appendChild(h("div",{cls:"alert alert-warn",sty:{marginBottom:12}},"Нет услуг. Создайте первую услугу ниже."));body.appendChild(newSvcWrap);}
+    // New service inline form — show when no services or __new__ explicitly selected
+    if(S.services.length===0||showNewSvcFlag){
+      if(S.services.length===0)body.appendChild(h("div",{cls:"alert alert-warn",sty:{marginBottom:8}},"Нет услуг. Создайте первую:"));
+      const newSvcWrap=h("div",{cls:"card",sty:{marginBottom:12}});
+      const svcName=h("input",{cls:"fi",placeholder:"Название услуги *",sty:{marginBottom:8}});
+      const svcPrice=h("input",{cls:"fi",type:"number",placeholder:"Стоимость, ₽",sty:{marginBottom:8}});
+      const svcDur=h("input",{cls:"fi",type:"number",placeholder:"Длительность, мин",sty:{marginBottom:8}});
+      newSvcWrap.appendChild(h("div",{sty:{fontWeight:700,marginBottom:8}},"Новая услуга"));
+      newSvcWrap.appendChild(h("div",{sty:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}},
+        h("div",{cls:"fg"},h("label",{cls:"fl"},"Название *"),svcName),
+        h("div",{cls:"fg"},h("label",{cls:"fl"},"Стоимость (₽)"),svcPrice)
+      ));
+      newSvcWrap.appendChild(h("div",{cls:"fg"},h("label",{cls:"fl"},"Длительность (мин)"),svcDur));
+      newSvcWrap.appendChild(h("button",{cls:"btn bp bsm",onclick:()=>{
+        if(!svcName.value.trim())return;
+        const sv={id:uid(),name:svcName.value.trim(),price:svcPrice.value||"",duration:parseInt(svcDur.value)||30};
+        S.services=[...S.services,sv];triggerSave(["services"]);
+        selSvc=sv;customDur=sv.duration;showNewSvcFlag=false;build();
+      }},"Создать и выбрать"));
+      body.appendChild(newSvcWrap);
+    }
     // Duration override
     if(selSvc){
       const durI=h("input",{cls:"fi",type:"number",value:customDur||selSvc.duration||30,onchange:e=>customDur=parseInt(e.target.value)||30});
@@ -897,7 +922,7 @@ function renderSchedule(role){
             const upSlot={...s,available:false,patientId:selPat.id,patientName:selPat.name,serviceId:selSvc.id,serviceName:selSvc.name,serviceDuration:dur};
             S.patients=S.patients.map(pr=>pr.id!==selPat.id?pr:{...pr,status:pr.status==="new"?"scheduled":pr.status});
             S.schedule={...S.schedule,[SCR.schDate]:{...S.schedule[SCR.schDate],slots:(S.schedule[SCR.schDate]?.slots||[]).map(sl=>sl.id!==s.id?sl:upSlot)}};
-            triggerSave(["patients","schedule"]);rebSlots();
+            triggerSave(["patients","schedule"]);detWrap.innerHTML="";rebSlots();
           }},canBook?"✓ Записать на приём":"Выберите пациента и услугу");
           bookBtn.disabled=!canBook;
           bookWrap.appendChild(h("div",{sty:{marginBottom:8}},bookBtn));
@@ -962,7 +987,7 @@ function renderSchedule(role){
     function updatePreview(){
       if(!srcI.value||!fromI.value||!toI.value||fromI.value>toI.value){previewEl.textContent="";return;}
       const srcMon=getMonday(srcI.value);
-      let count=0;const cur=new Date(fromI.value+" ");const end=new Date(toI.value+" ");
+      let count=0;const cur=new Date(fromI.value+"T12:00:00");const end=new Date(toI.value+"T12:00:00");
       while(cur<=end){const dow=cur.getDay();const ds=cur.toISOString().split("T")[0];
         if(dow!==0&&dow!==6){const srcD=new Date(srcMon+" ");srcD.setDate(srcD.getDate()+(dow===0?6:dow-1));const sds=srcD.toISOString().split("T")[0];if(S.schedule[sds]?.blocks?.length)count++;}
         cur.setDate(cur.getDate()+1);}
@@ -1012,6 +1037,7 @@ function renderAdminUsers(reb){
         h("div",{sty:{fontSize:12,color:"var(--mu)"}},u.email+" · "+ROLES[u.role])
       ),
       !isMe?h("div",{sty:{display:"flex",gap:6}},
+        h("button",{cls:"btn bs bsm","data-edit-uid":u.id},"✏️ Изм."),
         h("button",{cls:"btn bs bsm",onclick:async()=>{
           S.users=S.users.map(x=>x.id!==u.id?x:{...x,active:!(x.active!==false)});
           triggerSave(["users"]);reb&&reb();
@@ -1025,40 +1051,78 @@ function renderAdminUsers(reb){
     wrap.appendChild(row);
   });
   // Add user form
-  let showF=false;
-  const addBtn=h("button",{cls:"btn bs bw",sty:{marginTop:4},onclick:()=>{showF=true;rebF();}},"+  Добавить пользователя");
+  let showF=false,editUserId=null;
+  const addBtn=h("button",{cls:"btn bs bw",sty:{marginTop:4},onclick:()=>{showF=true;editUserId=null;rebF();}},"+  Добавить пользователя");
   const form=h("div",{cls:"card",sty:{marginTop:8,display:"none"}});
-  const nI=h("input",{cls:"fi",placeholder:"Имя",sty:{marginBottom:8}});
-  const eI=h("input",{cls:"fi",type:"email",placeholder:"email@example.com",sty:{marginBottom:8}});
-  const rSel=h("select",{cls:"fi",sty:{marginBottom:8}});
+  const nI=h("input",{cls:"fi",placeholder:"Имя пользователя"});
+  const eI=h("input",{cls:"fi",type:"email",placeholder:"login@example.com"});
+  const pI=h("input",{cls:"fi",type:"text",placeholder:"Пароль (мин. 4 символа)"});
+  const rSel=h("select",{cls:"fi"});
   Object.entries(ROLES).forEach(([k,v])=>rSel.appendChild(h("option",{value:k},v)));
-  form.appendChild(h("div",{sty:{fontWeight:700,marginBottom:10}},"Новый пользователь"));
-  form.appendChild(h("div",{cls:"fg"},h("label",{cls:"fl"},"Имя"),nI));
-  form.appendChild(h("div",{cls:"fg"},h("label",{cls:"fl"},"Email"),eI));
-  form.appendChild(h("div",{cls:"fg"},h("label",{cls:"fl"},"Роль"),rSel));
-  form.appendChild(h("div",{cls:"alert alert-warn",sty:{marginBottom:10}},"Пользователь получит ссылку на приложение, войдёт по своему email и установит пароль при первом входе."));
+  const formTitle=h("div",{sty:{fontWeight:700,marginBottom:10}},"Новый пользователь");
+  const credBox=h("div",{cls:"alert alert-ok",sty:{marginBottom:10,display:"none",whiteSpace:"pre-wrap",fontSize:13,wordBreak:"break-word"}});
+  form.appendChild(formTitle);
+  form.appendChild(h("div",{sty:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}},
+    h("div",{cls:"fg"},h("label",{cls:"fl"},"Имя"),nI),
+    h("div",{cls:"fg"},h("label",{cls:"fl"},"Логин (email)"),eI)
+  ));
+  form.appendChild(h("div",{sty:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}},
+    h("div",{cls:"fg"},h("label",{cls:"fl"},"Пароль"),pI),
+    h("div",{cls:"fg"},h("label",{cls:"fl"},"Роль"),rSel)
+  ));
+  form.appendChild(credBox);
   form.appendChild(h("div",{sty:{display:"flex",gap:8}},
     h("button",{cls:"btn bp",sty:{flex:1},onclick:async()=>{
-      if(!nI.value.trim()||!eI.value.trim())return;
+      if(!nI.value.trim()||!eI.value.trim()||!pI.value.trim()){
+        credBox.className="alert alert-err";credBox.style.display="block";credBox.textContent="Заполните все поля";return;
+      }
+      if(pI.value.trim().length<4){
+        credBox.className="alert alert-err";credBox.style.display="block";credBox.textContent="Пароль — минимум 4 символа";return;
+      }
       const email=eI.value.trim().toLowerCase();
-      if(S.users.find(u=>u.email===email)){alert("Пользователь с таким email уже существует");return;}
-      const nu={id:uid(),email,name:nI.value.trim(),role:rSel.value,passwordHash:null,active:true,createdAt:new Date().toISOString()};
-      S.users=[...S.users,nu];triggerSave(["users"]);
-      // Send invite email
+      const existing=S.users.find(u=>u.email===email);
+      if(existing&&existing.id!==editUserId){
+        credBox.className="alert alert-err";credBox.style.display="block";credBox.textContent="Пользователь с таким логином уже существует";return;
+      }
+      const hash=await hashPw(pI.value.trim());
+      if(editUserId){
+        // Edit existing
+        S.users=S.users.map(u=>u.id!==editUserId?u:{...u,email,name:nI.value.trim(),role:rSel.value,passwordHash:hash});
+      } else {
+        const nu={id:uid(),email,name:nI.value.trim(),role:rSel.value,passwordHash:hash,active:true,createdAt:new Date().toISOString()};
+        S.users=[...S.users,nu];
+      }
+      cacheSet("users",S.users);apiPost("users",S.users);_pendingKeys.delete("users");
+      // Show credentials to copy
       const appUrl=window.location.href.replace(/#.*$/,"");
-      const res=await apiSend("send_invite",{email:nu.email,name:nu.name,role:nu.role,roleName:ROLES[nu.role],appUrl});
-      showF=false;
-      // Show result
-      const note=h("div",{cls:"alert "+(res.ok?"alert-ok":"alert-warn"),sty:{marginTop:8}},
-        res.ok?"✓ Приглашение отправлено на "+nu.email:"Пользователь добавлен. Письмо не отправлено — проверьте, что Apps Script имеет доступ к Gmail."
-      );
-      form.parentNode.insertBefore(note,form.nextSibling);
-      setTimeout(()=>note.remove(),5000);
-      reb&&reb();
-    }},"Добавить"),
-    h("button",{cls:"btn bs",onclick:()=>{showF=false;rebF();}},"Отмена")
+      credBox.className="alert alert-ok";credBox.style.display="block";
+      const savedPw=pI.value.trim(),savedEmail=email,savedName=nI.value.trim();
+      nI.value="";eI.value="";pI.value="";const wasEdit=editUserId;editUserId=null;
+      credBox.textContent="✓ "+(wasEdit?"Обновлено":"Создан")+"! Передайте участнику:
+
+Ссылка: "+appUrl+"
+Логин: "+savedEmail+"
+Пароль: "+savedPw;
+      // Copy to clipboard
+      navigator.clipboard?.writeText("Ссылка: "+appUrl+"
+Логин: "+savedEmail+"
+Пароль: "+savedPw).catch(()=>{});
+      setTimeout(()=>{ credBox.style.display="none"; reb&&reb(); },8000);
+    }},editUserId?"Сохранить":"Создать"),
+    h("button",{cls:"btn bs",onclick:()=>{showF=false;editUserId=null;rebF();credBox.style.display="none";}},"Отмена")
   ));
   function rebF(){addBtn.style.display=showF?"none":"flex";form.style.display=showF?"block":"none";}
+  // Edit buttons on user rows — hook into showF/editUserId
+  wrap.querySelectorAll("[data-edit-uid]").forEach(btn=>{
+    btn.onclick=()=>{
+      const uid=btn.dataset.editUid;
+      const u=S.users.find(x=>x.id===uid);
+      if(!u)return;
+      editUserId=uid;nI.value=u.name;eI.value=u.email;
+      rSel.value=u.role;pI.value="";formTitle.textContent="Редактировать: "+u.name;
+      showF=true;rebF();form.scrollIntoView({behavior:"smooth",block:"nearest"});
+    };
+  });
   wrap.appendChild(addBtn);wrap.appendChild(form);
   return wrap;
 }
@@ -1113,9 +1177,7 @@ async function savePats(arr,noRender){
 // ===================== DOCTOR / ADMIN =====================
 function renderDoctor(){
   const td=today();
-  const todaySl=(S.schedule[td]?.slots||[]).filter(s=>!s.available&&s.patientId);
-  const needC=S.patients.filter(p=>p.nextContact&&p.nextContact<=td);
-  const upOps=S.patients.filter(p=>p.opDate&&p.opDate>=td).sort((a,b)=>a.opDate.localeCompare(b.opDate));
+  // Live data computed in rebMain to stay fresh
   const wrap=h("div",{cls:"desktop"});
   const sb=h("div",{cls:"sb"});
   sb.appendChild(h("div",{sty:{marginBottom:20,paddingLeft:4}},
@@ -1140,15 +1202,27 @@ function renderDoctor(){
     sb.appendChild(prvSec);
   }
   sb.appendChild(mkSyncBar());
+  sb.appendChild(h("button",{cls:"si",onclick:()=>{
+    const u=S.users.find(x=>x.id===S.session?.userId);
+    if(u){SCR.dview="changepw";SCR.editId=null;rebMain();}
+  }},"🔑 Сменить пароль"));
   sb.appendChild(h("button",{cls:"si",sty:{color:"var(--r)"},onclick:()=>{S.session=null;saveCfg();render();}},"🚪 Выход"));
   const main=h("div",{cls:"dmain"});
   function rebMain(){
+    // Recompute live data on each navigation
+    const todaySl=(S.schedule[td]?.slots||[]).filter(s=>!s.available&&s.patientId);
+    const needC=S.patients.filter(p=>p.nextContact&&p.nextContact<=td);
+    const upOps=S.patients.filter(p=>p.opDate&&p.opDate>=td).sort((a,b)=>a.opDate.localeCompare(b.opDate));
     sb.querySelectorAll(".si").forEach((b,i)=>{if(i<navItems.length)b.className="si"+(navItems[i].k===SCR.dview&&!SCR.editId?" on":"");});
     main.innerHTML="";
     if(SCR.editId){const p=S.patients.find(x=>x.id===SCR.editId);main.appendChild(renderPatDetail(p,S.session.role,()=>{SCR.editId=null;rebMain();}));}
     else if(SCR.dview==="dashboard")main.appendChild(docDash(todaySl,needC,upOps,td,rebMain));
     else if(SCR.dview==="patients")main.appendChild(docPats(td,rebMain));
     else if(SCR.dview==="schedule")main.appendChild(renderSchedule(S.session.role));
+    else if(SCR.dview==="changepw"){
+      const u=S.users.find(x=>x.id===S.session?.userId);
+      if(u)main.appendChild(renderChangePassword(u,()=>{SCR.dview="dashboard";rebMain();}));
+    }
     else if(SCR.dview==="admin"){
       const adminTabs=h("div",{cls:"tabs",sty:{marginBottom:16}});
       const adminMain=h("div",{});
@@ -1255,7 +1329,7 @@ function renderAddPatForm(role,onBack){
     h("button",{cls:"btn bp bw",onclick:async()=>{
       if(!v.name.trim()||!v.phone.trim())return;
       const p={id:uid(),name:nI.value.trim(),phone:phI.value.trim(),source:sS.value,birthDate:bdI.value,complaint:cI.value,tasks:[],notes:[],createdAt:new Date().toISOString(),status:"new"};
-      await savePats([...S.patients,p]);onBack();
+      await savePats([...S.patients,p],true);onBack();
     }},"Добавить пациента")
   );
 }
@@ -1272,9 +1346,20 @@ function renderAssistant(){
   const wrap=h("div",{sty:{display:"flex",flexDirection:"column",minHeight:"100vh",background:"var(--bg)"}});
   const hdr=h("header",{cls:"hdr"},
     h("div",{},h("div",{cls:"ht"},"🩺 Доктор Войнов"),h("div",{cls:"hs"},S.session?.name||"Ассистент")),
-    h("button",{cls:"hb",onclick:()=>{S.session=null;saveCfg();render();}},"Выход"));
+    h("div",{sty:{display:"flex",gap:6}},
+      h("button",{cls:"hb",onclick:()=>{
+        const u=S.users.find(x=>x.id===S.session?.userId);
+        if(!u)return;
+        SCR.sub="changepw";render();
+      }},"🔑"),
+      h("button",{cls:"hb",onclick:()=>{S.session=null;saveCfg();render();}},"Выход")
+    ));
   let content;
-  if(SCR.sub==="addpat")content=renderAddPatForm("assistant",()=>{SCR.sub=null;render();});
+  if(SCR.sub==="changepw"){
+    const u=S.users.find(x=>x.id===S.session?.userId);
+    content=u?renderChangePassword(u,()=>{SCR.sub=null;render();}):h("div",{},"");
+  }
+  else if(SCR.sub==="addpat")content=renderAddPatForm("assistant",()=>{SCR.sub=null;render();});
   else if(SCR.sub==="pat"&&SCR.editId){const p=S.patients.find(x=>x.id===SCR.editId);content=renderPatDetail(p,"assistant",()=>{SCR.sub=null;SCR.editId=null;render();});}
   else if(SCR.tab==="today")content=renderToday(ov,tT,lT,needC);
   else if(SCR.tab==="pats")content=renderPatsTab();
@@ -1297,7 +1382,11 @@ function renderAssistant(){
 
 function renderToday(ov,tT,lT,needC){
   const f=document.createDocumentFragment();
-  f.appendChild(h("div",{sty:{fontSize:18,fontWeight:800,marginBottom:4}},"Задачи на сегодня"));
+  const todayTopRow=h("div",{sty:{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:4}},
+    h("div",{sty:{fontSize:18,fontWeight:800}},"Задачи на сегодня"),
+    h("button",{cls:"btn bp bsm",onclick:()=>{SCR.sub="addpat";render();}},"+ Пациент")
+  );
+  f.appendChild(todayTopRow);
   f.appendChild(h("div",{sty:{fontSize:13,color:"var(--mu)",marginBottom:12}},new Date().toLocaleDateString("ru-RU",{weekday:"long",day:"numeric",month:"long"})));
   if(needC.length){
     f.appendChild(h("div",{cls:"st",sty:{color:"var(--a)"}},"📞 Требуют контакта — "+needC.length));
@@ -1310,11 +1399,13 @@ function renderToday(ov,tT,lT,needC){
   return f;
 }
 function taskRowSimple(t,urg,fut){
-  const el=h("div",{cls:"task-item"+(urg?" ":" "),sty:urg?{borderLeft:"3px solid var(--r)"}:{}});
+  const el=h("div",{cls:"task-item",sty:urg?{borderLeft:"3px solid var(--r)"}:{}});
   el.style.borderLeft=urg?"3px solid var(--r)":"";
   const chk=h("button",{cls:"task-done-btn",onclick:async e=>{
     e.stopPropagation();
-    await savePats(S.patients.map(p=>p.id!==t.pId?p:{...p,tasks:(p.tasks||[]).map(tk=>tk.id!==t.id?tk:{...tk,completed:true,completedAt:new Date().toISOString()})}));
+    await savePats(S.patients.map(p=>p.id!==t.pId?p:{...p,tasks:(p.tasks||[]).map(tk=>tk.id!==t.id?tk:{...tk,completed:true,completedAt:new Date().toISOString()})}),true);
+    // Remove from today list
+    const row=e.target.closest(".task-item");if(row)row.remove();
   }},"✓");
   const hdr=h("div",{cls:"task-hdr",onclick:()=>{SCR.openTaskId=t.id;SCR.sub="pat";SCR.editId=t.pId;render();}},
     h("div",{sty:{flex:1}},
